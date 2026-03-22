@@ -1,0 +1,7 @@
+/* src/assets/styles/global.css */
+@import "tailwindcss";
+
+/* You can still add your custom classes below the import */
+.my-custom-class {
+  background: red;
+}

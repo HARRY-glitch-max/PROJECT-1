@@ -1,49 +1,125 @@
 import Job from "../models/Job.js";
+import Notification from "../models/Notification.js";
+import User from "../models/User.js"; // assuming jobseekers are stored in User model
+import { notifyJobseeker } from "../utils/notifyJobseeker.js";
 
-// @desc    Get all jobs
-// @route   GET /api/jobs
-// @access  Public
-export const getJobs = async (req, res) => {
-  try {
-    const jobs = await Job.find().populate("postedBy", "name email");
-    res.status(200).json(jobs);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch jobs", error });
-  }
-};
-
-// @desc    Create a new job
-// @route   POST /api/jobs
-// @access  Private (Employer only)
-export const createJob = async (req, res) => {
-  try {
-    const { title, description, company, location, salary } = req.body;
-
-    const job = new Job({
-      title,
-      description,
-      company,
-      location,
-      salary,
-      postedBy: req.user._id, // assuming req.user is set by auth middleware
+// Helper to notify all jobseekers
+const notifyAllJobseekers = async (job, type, message, subject) => {
+  const jobseekers = await User.find({}, "name email"); // adjust query to target specific jobseekers
+  for (const seeker of jobseekers) {
+    // 🔔 Save notification in DB
+    await Notification.create({
+      userId: seeker._id,
+      type,
+      content: message,
     });
 
-    const savedJob = await job.save();
-    res.status(201).json(savedJob);
-  } catch (error) {
-    res.status(400).json({ message: "Job creation failed", error });
+    // 📧 Send email
+    await notifyJobseeker({
+      email: seeker.email,
+      name: seeker.name,
+      subject,
+      message,
+    });
   }
 };
 
-// @desc    Get a single job by ID
-// @route   GET /api/jobs/:id
-// @access  Public
-export const getJobById = async (req, res) => {
+// Create a new job
+const createJob = async (req, res) => {
   try {
-    const job = await Job.findById(req.params.id).populate("postedBy", "name email");
-    if (!job) return res.status(404).json({ message: "Job not found" });
-    res.status(200).json(job);
+    const { employerId, title, description, requirements } = req.body;
+
+    const job = new Job({ employerId, title, description, requirements });
+    await job.save();
+
+    // 🔔 + 📧 Notify jobseekers
+    await notifyAllJobseekers(
+      job,
+      "job_posting",
+      `A new job "${job.title}" has been posted.`,
+      "New Job Alert"
+    );
+
+    res.status(201).json({ message: "Job created successfully and notifications sent", job });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching job", error });
+    res.status(500).json({ message: error.message });
   }
+};
+
+// Get all jobs
+const getJobs = async (req, res) => {
+  try {
+    const jobs = await Job.find().populate("employerId", "companyName industry");
+    res.json(jobs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get job by ID
+const getJobById = async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id).populate("employerId", "companyName industry");
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+    res.json(job);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update job
+const updateJob = async (req, res) => {
+  try {
+    const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true })
+      .populate("employerId", "companyName");
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // 🔔 + 📧 Notify jobseekers
+    await notifyAllJobseekers(
+      job,
+      "job_update",
+      `The job "${job.title}" has been updated by ${job.employerId.companyName}.`,
+      "Job Update Notification"
+    );
+
+    res.json({ message: "Job updated successfully and notifications sent", job });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete job
+const deleteJob = async (req, res) => {
+  try {
+    const job = await Job.findByIdAndDelete(req.params.id);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // 🔔 + 📧 Notify jobseekers
+    await notifyAllJobseekers(
+      job,
+      "job_delete",
+      `The job "${job.title}" has been removed.`,
+      "Job Removed Notification"
+    );
+
+    res.json({ message: "Job deleted successfully and notifications sent" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Export all functions
+export {
+  createJob,
+  getJobs,
+  getJobById,
+  updateJob,
+  deleteJob
 };

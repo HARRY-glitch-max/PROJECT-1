@@ -1,20 +1,25 @@
-import * as React from "react"
+import React from "react";
 
-import { cn } from "@/lib/utils"
-
-function Textarea({
-  className,
-  ...props
-}) {
+const Textarea = ({
+  name,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+  className = "",
+  required = false,
+}) => {
   return (
     <textarea
-      data-slot="textarea"
-      className={cn(
-        "border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        className
-      )}
-      {...props} />
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={rows}
+      required={required}
+      className={`w-full border px-3 py-2 rounded focus:ring focus:ring-blue-300 focus:outline-none ${className}`}
+    />
   );
-}
+};
 
-export { Textarea }
+export default Textarea;

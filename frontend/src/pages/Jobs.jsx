@@ -1,45 +1,63 @@
-import React, { useEffect, useState } from "react";
-import JobCard from "../components/JobCard";
-import { getJobs } from "../services/api";
+// src/pages/Jobs.jsx
+import React, { useEffect, useState, useContext } from "react";
+import { getJobs, applyToJob } from "../services/api";
+import { AuthContext } from "../contexts/AuthContext";
 
-const Jobs = () => {
+export default function Jobs() {
+  const { auth } = useContext(AuthContext);
   const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [appliedJobs, setAppliedJobs] = useState([]);
 
   useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        const res = await getJobs();
+    getJobs()
+      .then(res => {
         setJobs(res.data);
-      } catch (err) {
-        setError("Failed to load jobs. Please try again.");
-      } finally {
         setLoading(false);
-      }
-    };
-
-    fetchJobs();
+      })
+      .catch(() => {
+        setError("Failed to load jobs");
+        setLoading(false);
+      });
   }, []);
 
+  const handleApply = async (jobId) => {
+    try {
+      await applyToJob(jobId, {});
+      setAppliedJobs([...appliedJobs, jobId]);
+    } catch {
+      setError("Failed to apply");
+    }
+  };
+
+  if (loading) return <p className="p-4">Loading jobs...</p>;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-blue-700 mb-6">Available Jobs</h1>
-
-      {loading && <p className="text-gray-500">Loading jobs...</p>}
-      {error && <p className="text-red-500">{error}</p>}
-
-      {jobs.length === 0 && !loading ? (
-        <p className="text-gray-600">No jobs found.</p>
-      ) : (
-        <div className="grid gap-6">
-          {jobs.map((job) => (
-            <JobCard key={job._id} job={job} />
-          ))}
-        </div>
-      )}
+    <div className="container mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-4">Available Jobs</h2>
+      {error && <p className="text-red-600">{error}</p>}
+      <ul className="space-y-4">
+        {jobs.map(job => (
+          <li key={job._id} className="border p-4 rounded shadow">
+            <h3 className="text-xl font-semibold">{job.title}</h3>
+            <p className="text-gray-600">{job.description}</p>
+            {auth && (
+              <button
+                onClick={() => handleApply(job._id)}
+                disabled={appliedJobs.includes(job._id)}
+                className={`mt-2 px-3 py-1 rounded ${
+                  appliedJobs.includes(job._id)
+                    ? "bg-gray-400 text-white cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                {appliedJobs.includes(job._id) ? "Applied" : "Apply"}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
-};
-
-export default Jobs;
+}

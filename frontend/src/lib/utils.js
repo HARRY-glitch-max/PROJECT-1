@@ -1,6 +1,12 @@
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge"
+export const formatSalary = (amount) =>
+  amount ? `$${Number(amount).toLocaleString()}` : "Not specified";
 
-export function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
+export const formatDate = (date) =>
+  new Date(date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+export const truncateText = (text, length = 120) =>
+  text && text.length > length ? `${text.slice(0, length)}...` : text;

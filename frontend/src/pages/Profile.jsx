@@ -1,64 +1,94 @@
 import React, { useEffect, useState } from "react";
-import { getProfile } from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { getProfile, updateProfile } from "../services/api";
 
-const Profile = () => {
-  const [user, setUser] = useState(null);
+export default function Profile() {
+  const [profile, setProfile] = useState(null);
+  const [formData, setFormData] = useState({ name: "", email: "" });
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await getProfile();
-        setUser(res.data);
-      } catch (err) {
-        setError("Failed to load profile. Please login again.");
-        localStorage.removeItem("token");
-        navigate("/login");
-      }
-    };
+    getProfile()
+      .then(res => {
+        setProfile(res.data);
+        setFormData({ name: res.data.name, email: res.data.email });
+      })
+      .catch(() => setProfile(null));
+  }, []);
 
-    fetchProfile();
-  }, [navigate]);
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-600 text-lg">{error || "Loading profile..."}</p>
-      </div>
-    );
-  }
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    try {
+      const res = await updateProfile(formData); // ✅ only pass formData
+      setProfile(res.data);
+      setSuccess("Profile updated successfully!");
+      setEditing(false);
+    } catch (err) {
+      setError(err.response?.data?.message || "Update failed");
+    }
+  };
+
+  if (!profile) return <p className="p-6">Loading profile...</p>;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-blue-700 mb-6">My Profile</h1>
+    <div className="container mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-4">My Profile</h2>
 
-      <div className="bg-white shadow-md rounded-lg p-6">
-        <p className="text-lg mb-2">
-          <span className="font-semibold">Name:</span> {user.name}
-        </p>
-        <p className="text-lg mb-2">
-          <span className="font-semibold">Email:</span> {user.email}
-        </p>
-        <p className="text-lg mb-2">
-          <span className="font-semibold">Role:</span> {user.role}
-        </p>
-
-        {user.role === "employer" && (
-          <p className="text-gray-600 mt-4">
-            You can post jobs from the <strong>Job Form</strong> page.
-          </p>
-        )}
-
-        {user.role === "jobseeker" && (
-          <p className="text-gray-600 mt-4">
-            You can apply to jobs from the <strong>Jobs</strong> page.
-          </p>
-        )}
-      </div>
+      {!editing ? (
+        <>
+          <p><strong>Name:</strong> {profile.name}</p>
+          <p><strong>Email:</strong> {profile.email}</p>
+          <button
+            onClick={() => setEditing(true)}
+            className="mt-4 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+          >
+            Edit Profile
+          </button>
+        </>
+      ) : (
+        <form onSubmit={handleUpdate} className="space-y-4">
+          {error && <p className="text-red-600">{error}</p>}
+          {success && <p className="text-green-600">{success}</p>}
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full border rounded px-3 py-2"
+            required
+          />
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full border rounded px-3 py-2"
+            required
+          />
+          <div className="flex space-x-2">
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="bg-gray-300 text-black px-3 py-1 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
-};
-
-export default Profile;
+}

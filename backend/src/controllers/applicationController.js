@@ -1,56 +1,187 @@
 import Application from "../models/Application.js";
+import Notification from "../models/Notification.js";
+import { notifyJobseeker } from "../utils/notifyJobseeker.js";
+import { v2 as cloudinary } from "cloudinary";
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// @desc    Submit a job application
-// @route   POST /api/applications
-// @access  Private (User only)
-export const submitApplication = async (req, res) => {
+// 1. Submit a new application + Cloudinary Resume + Email Confirmation
+export const createApplication = async (req, res) => {
   try {
-    const { jobId, resume, coverLetter } = req.body;
+    const { jobId, userId } = req.body;
 
-    const job = await Job.findById(jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (!req.file) {
+      return res.status(400).json({ message: "Please upload your resume (PDF/DOCX)" });
+    }
 
-    const application = new Application({
-      job: jobId,
-      applicant: req.user._id,
-      resume,
-      coverLetter,
+    // Upload buffer to Cloudinary
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "resumes", resource_type: "raw" },
+        (error, uploaded) => {
+          if (error) reject(error);
+          else resolve(uploaded);
+        }
+      );
+      stream.end(req.file.buffer);
     });
 
-    const savedApp = await application.save();
-    res.status(201).json(savedApp);
+    // Create application with the Cloudinary resume URL
+    const newApp = new Application({ jobId, userId, resume: result.secure_url });
+    await newApp.save();
+
+    const application = await Application.findById(newApp._id)
+      .populate("userId", "name email")
+      .populate("jobId", "title");
+
+    // 📧 Confirmation Email
+    await notifyJobseeker({
+      email: application.userId.email,
+      name: application.userId.name,
+      subject: "Application Successfully Received",
+      message: `Thank you for applying for the "${application.jobId.title}" position. Your resume has been uploaded successfully, and the employer has been notified.`,
+    });
+
+    res.status(201).json({
+      message: "Application submitted and email confirmation sent!",
+      application,
+    });
   } catch (error) {
-    res.status(400).json({ message: "Application failed", error });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Get applications submitted by current user
-// @route   GET /api/applications/my
-// @access  Private
-export const getMyApplications = async (req, res) => {
+// 2. Update status + Professional Update Email
+export const updateApplicationStatus = async (req, res) => {
   try {
-    const apps = await Application.find({ applicant: req.user._id })
-      .populate("job", "title company location")
-      .sort({ createdAt: -1 });
+    const { id } = req.params;
+    const { status } = req.body;
 
-    res.status(200).json(apps);
+    const application = await Application.findByIdAndUpdate(id, { status }, { new: true })
+      .populate("userId", "name email")
+      .populate("jobId", "title");
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    await Notification.create({
+      userId: application.userId._id,
+      type: "application_status",
+      content: `Update: Your application status for "${application.jobId.title}" is now ${status}.`,
+    });
+
+    await notifyJobseeker({
+      email: application.userId.email,
+      name: application.userId.name,
+      subject: `Application Update: ${status}`,
+      message: `The employer has updated your application status for "${application.jobId.title}". Your current status is: **${status}**.`,
+    });
+
+    res.json({ message: "Application status updated successfully", application });
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch applications", error });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Get applications for a job (employer view)
-// @route   GET /api/applications/job/:jobId
-// @access  Private (Employer only)
-export const getApplicationsForJob = async (req, res) => {
+// 3. Shortlist candidate + Special Shortlist Email
+export const shortlistCandidate = async (req, res) => {
   try {
-    const apps = await Application.find({ job: req.params.jobId })
-      .populate("applicant", "name email")
-      .sort({ createdAt: -1 });
+    const application = await Application.findById(req.params.id)
+      .populate("userId", "name email")
+      .populate("jobId", "title");
 
-    res.status(200).json(apps);
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    application.status = "shortlisted";
+    application.shortlistedDate = new Date();
+    await application.save();
+
+    await Notification.create({
+      userId: application.userId._id,
+      type: "application_status",
+      content: `Congratulations! You've been shortlisted for "${application.jobId.title}".`,
+    });
+
+    await notifyJobseeker({
+      email: application.userId.email,
+      name: application.userId.name,
+      subject: "Good News: You've been Shortlisted!",
+      message: `Excellent news, ${application.userId.name}! You have been shortlisted for the "${application.jobId.title}" role. Expect to hear from the hiring team soon regarding next steps.`,
+    });
+
+    res.json({ message: "Candidate shortlisted", application });
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch job applications", error });
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// --- GETTERS & HELPERS ---
+export const getApplications = async (req, res) => {
+  try {
+    const applications = await Application.find()
+      .populate("jobId", "title")
+      .populate("userId", "name email");
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getApplicationById = async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id)
+      .populate("jobId", "title")
+      .populate("userId", "name email");
+    if (!application) return res.status(404).json({ message: "Application not found" });
+    res.json(application);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const deleteApplication = async (req, res) => {
+  try {
+    const application = await Application.findByIdAndDelete(req.params.id);
+    if (!application) return res.status(404).json({ message: "Application not found" });
+    res.json({ message: "Application deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getApplicationsByJob = async (req, res) => {
+  try {
+    const applications = await Application.find({ jobId: req.params.jobId })
+      .populate("userId", "name email");
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getApplicationsByUser = async (req, res) => {
+  try {
+    const applications = await Application.find({ userId: req.params.userId })
+      .populate("jobId", "title");
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getShortlistedApplicationsByJob = async (req, res) => {
+  try {
+    const applications = await Application.find({ jobId: req.params.jobId, status: "shortlisted" })
+      .populate("userId", "name email");
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

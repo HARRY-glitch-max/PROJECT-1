@@ -1,80 +1,93 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import Input from "../components/ui/Input";
+import Button from "../components/ui/Button";
 import { loginUser } from "../services/api";
+import { AuthContext } from "../contexts/AuthContext";
 
-const Login = () => {
+export default function Login() {
+  const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
       const res = await loginUser(formData);
-      localStorage.setItem("token", res.data.token);
-      navigate("/profile");
+
+      // 1. Destructure the response
+      const { token, ...user } = res.data;
+
+      // 2. IMPORTANT: Save the token specifically as "token" for the API interceptor
+      localStorage.setItem("token", token);
+
+      // 3. Update Global Auth State
+      login(user, token);
+
+      // 4. Smart Redirect based on role
+      if (user.roles === "admin") {
+        navigate("/admin/dashboard");
+      } else if (user.roles === "employer") {
+        navigate("/employer/dashboard");
+      } else {
+        navigate("/profile"); // Default for jobseekers
+      }
+
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      // Catch specific backend messages like "Invalid email or password"
+      setError(err.response?.data?.message || "Login failed. Please check your connection.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white shadow-md rounded-lg p-6 w-full max-w-md"
-      >
-        <h2 className="text-2xl font-bold text-blue-700 mb-4">Login</h2>
+    <div className="max-w-md mx-auto mt-10 bg-white shadow-md p-6 rounded-lg border border-gray-100">
+      <h2 className="text-2xl font-bold text-blue-700 mb-4">Welcome Back</h2>
+      <p className="text-gray-500 mb-6 text-sm">Please enter your details to sign in.</p>
+      
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-3 mb-4">
+          <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
 
-        {error && <p className="text-red-500 mb-3">{error}</p>}
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Email Address</label>
+          <Input
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
+            placeholder="name@company.com"
             required
           />
         </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <input
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Password</label>
+          <Input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
+            placeholder="••••••••"
             required
           />
         </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full"
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
+        <Button type="submit" className="w-full py-3" disabled={loading}>
+          {loading ? "Verifying..." : "Sign In"}
+        </Button>
       </form>
     </div>
   );
-};
-
-export default Login;
+}

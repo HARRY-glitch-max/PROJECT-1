@@ -1,44 +1,44 @@
-import axios from "axios";
+import * as api from "../services/api";
 
-// Create Axios instance
-const API = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  
-});
+// Auth
+export const register = api.registerUser;
+export const login = api.loginUser;
+export const profile = api.getProfile;
 
-// Attach token to requests if available
-API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Jobs
+export const jobs = {
+  list: api.getJobs,
+  get: api.getJobById,
+  create: api.createJob,
+  update: api.updateJob,
+  remove: api.deleteJob,
+};
 
-// =======================
-// Auth Endpoints
-// =======================
+// Applications
+export const applications = {
+  list: api.getApplications,
+  apply: api.applyToJob,
+  update: api.updateApplication,
+  remove: api.deleteApplication,
+};
 
-export const registerUser = (data) => API.post("/users/register", data);
-export const loginUser = (data) => API.post("/users/login", data);
-export const getProfile = () => API.get("/users/profile");
+// Interviews
+export const interviews = {
+  list: api.getInterviews,
+  schedule: api.scheduleInterview,
+  update: api.updateInterview,
+  cancel: api.cancelInterview,
+};
 
-// =======================
-// Job Endpoints
-// =======================
+// Notifications
+export const notifications = {
+  list: api.getNotifications,
+  markRead: api.markNotificationRead,
+};
 
-export const getJobs = () => API.get("/jobs");
-export const getJobById = (id) => API.get(`/jobs/${id}`);
-export const createJob = (data) => API.post("/jobs", data);
-export const updateJob = (id, data) => API.put(`/jobs/${id}`, data);
-export const deleteJob = (id) => API.delete(`/jobs/${id}`);
-
-// =======================
-// Application Endpoints
-// =======================
-
-export const applyToJob = (jobId, data) => API.post(`/applications/${jobId}`, data);
-export const getApplications = () => API.get("/applications");
+// Chat
+export const chat = {
+  list: api.getChats,
+  send: api.sendMessage,
+  messages: api.getMessages,
+};

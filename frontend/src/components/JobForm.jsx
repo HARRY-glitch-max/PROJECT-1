@@ -1,123 +1,87 @@
 import React, { useState } from "react";
-import { createJob } from "../lib/api";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader } from "./ui/card";
-import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
+import Input from "./ui/Input";
+import Textarea from "./ui/Textarea";
+import Button from "./ui/Button";
+import Card from "./ui/Card";
 
-const JobForm = ({ onJobCreated }) => {
+const JobForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
     title: "",
-    description: "",
+    company: "",
     location: "",
     salary: "",
-    company: "",
+    description: "",
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await createJob(formData);
-      if (onJobCreated) onJobCreated(res.data);
-      setFormData({
-        title: "",
-        description: "",
-        location: "",
-        salary: "",
-        company: "",
-      });
-    } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong.");
-    } finally {
-      setLoading(false);
+    if (onSubmit) {
+      onSubmit(formData);
     }
+    console.log("Job posted:", formData);
+    setFormData({
+      title: "",
+      company: "",
+      location: "",
+      salary: "",
+      description: "",
+    });
   };
 
   return (
-    <Card className="max-w-xl mx-auto shadow-md p-6">
-      <CardHeader>
-        <h2 className="text-xl font-bold">Post a Job</h2>
-      </CardHeader>
-
-      <CardContent>
-        {error && <p className="text-red-500 mb-3">{error}</p>}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Job Title</label>
-            <Input
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              placeholder="e.g. Frontend Developer"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <Textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows="4"
-              placeholder="Briefly describe the job..."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Location</label>
-            <Input
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="e.g. New York, Remote"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Salary</label>
-            <Input
-              type="number"
-              name="salary"
-              value={formData.salary}
-              onChange={handleChange}
-              placeholder="e.g. 80000"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Company</label>
-            <Input
-              name="company"
-              value={formData.company}
-              onChange={handleChange}
-              placeholder="e.g. OpenAI"
-              required
-            />
-          </div>
-
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Posting..." : "Post Job"}
-          </Button>
-        </form>
-      </CardContent>
+    <Card className="max-w-lg mx-auto mt-10">
+      <h2 className="text-2xl font-bold text-blue-700 mb-4">Post a Job</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          type="text"
+          name="title"
+          value={formData.title}
+          onChange={handleChange}
+          placeholder="Job Title"
+          required
+        />
+        <Input
+          type="text"
+          name="company"
+          value={formData.company}
+          onChange={handleChange}
+          placeholder="Company"
+          required
+        />
+        <Input
+          type="text"
+          name="location"
+          value={formData.location}
+          onChange={handleChange}
+          placeholder="Location"
+          required
+        />
+        <Input
+          type="number"
+          name="salary"
+          value={formData.salary}
+          onChange={handleChange}
+          placeholder="Salary"
+        />
+        <Textarea
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          placeholder="Job Description"
+          rows={6}
+          required
+        />
+        <Button type="submit" className="w-full">
+          Post Job
+        </Button>
+      </form>
     </Card>
   );
 };
