@@ -1,68 +1,78 @@
-// src/pages/EmployerDashboard.jsx
+// src/pages/JobseekerDashboard.jsx
 import { Routes, Route, NavLink, useNavigate } from "react-router-dom";
 import { useContext } from "react";
-import Chat from "./Chat";
-import PostJob from "./PostJob";
-import Interviews from "./Interviews";
+import Jobs from "./Jobs";
+import MyApplications from "./MyApplications";
+import Messages from "./Messages";
+import JobseekerProfile from "./JobseekerProfile"; // ✅ updated import
 import { AuthContext } from "../contexts/AuthContext";
 import Button from "../components/ui/Button";
 
-export default function EmployerDashboard() {
+export default function JobseekerDashboard() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="w-64 bg-blue-700 text-white p-6">
-        <h2 className="text-xl font-bold mb-6">Employer Dashboard</h2>
+      <aside className="w-64 bg-green-700 text-white p-6">
+        <h2 className="text-xl font-bold mb-6">Jobseeker Dashboard</h2>
         <ul className="space-y-3">
           <li>
             <NavLink
-              to="interviews"
+              to="jobs"
               className={({ isActive }) =>
                 isActive ? "font-bold underline" : "hover:underline"
               }
             >
-              Interviews
+              Browse Jobs
             </NavLink>
           </li>
           <li>
             <NavLink
-              to="chat"
+              to="applications"
               className={({ isActive }) =>
                 isActive ? "font-bold underline" : "hover:underline"
               }
             >
-              Chat
+              My Applications
             </NavLink>
           </li>
           <li>
             <NavLink
-              to="post-job"
+              to="messages"
               className={({ isActive }) =>
                 isActive ? "font-bold underline" : "hover:underline"
               }
             >
-              Post Job
+              Messages
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="profile"
+              className={({ isActive }) =>
+                isActive ? "font-bold underline" : "hover:underline"
+              }
+            >
+              Profile
             </NavLink>
           </li>
         </ul>
 
-        {/* Optional: quick navigation button */}
+        {/* Optional quick navigation */}
         <div className="mt-6">
-          <Button onClick={() => navigate("/employer/profile")}>
-            Go to Profile
-          </Button>
+          <Button onClick={() => navigate("/jobs")}>Find Jobs</Button>
         </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 p-8">
         <Routes>
-          <Route path="interviews" element={<Interviews />} />
-          <Route path="chat" element={<Chat />} />
-          <Route path="post-job" element={<PostJob />} />
+          <Route path="jobs" element={<Jobs />} />
+          <Route path="applications" element={<MyApplications />} />
+          <Route path="messages" element={<Messages />} />
+          <Route path="profile" element={<JobseekerProfile />} /> {/* ✅ updated */}
         </Routes>
       </main>
     </div>

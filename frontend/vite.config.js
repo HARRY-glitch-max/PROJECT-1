@@ -19,14 +19,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // ✅ The Proxy acts as a "Bridge" between Jeremiah's browser and your Node server
+    // ✅ The Proxy acts as a "Bridge" between the browser and your Node server
     proxy: {
       "/api": {
-        // Change 'localhost' to '127.0.0.1' to match your Backend server exactly
-        target: "http://127.0.0.1:5000", 
+        // ✅ CHANGED: Using 'localhost' matches the standard Node server output
+        target: "http://localhost:5000", 
         changeOrigin: true,
         secure: false,
-        // Optional: rewrite the path if your backend doesn't expect "/api"
+        // Keep this commented out unless your backend DOES NOT use the "/api" prefix
         // rewrite: (path) => path.replace(/^\/api/, ''), 
       },
     },

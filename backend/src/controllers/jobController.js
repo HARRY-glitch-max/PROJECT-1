@@ -1,6 +1,6 @@
 import Job from "../models/Job.js";
 import Notification from "../models/Notification.js";
-import User from "../models/User.js"; // assuming jobseekers are stored in User model
+import User from "../models/Jobseeker.js"; // assuming jobseekers are stored in User model
 import { notifyJobseeker } from "../utils/notifyJobseeker.js";
 
 // Helper to notify all jobseekers

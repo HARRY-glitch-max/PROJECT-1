@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.jsx
 import { createContext, useState, useEffect } from 'react';
 import apiClient from '../api/client';
 
@@ -7,7 +8,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Sync session on load
   useEffect(() => {
     const savedUser = localStorage.getItem('jobConnectUser');
     if (savedUser) {
@@ -20,30 +20,38 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  /**
-   * Universal Login
-   * Hits /admin/login for Admins or /users/login for others
-   */
-  const login = async (email, password, isAdmin = false) => {
-    const endpoint = isAdmin ? '/admin/login' : '/users/login';
-    const { data } = await apiClient.post(endpoint, { email, password });
+  const login = async (email, password, role = 'jobseeker') => {
+    let endpoint;
+    if (role === 'admin') {
+      endpoint = '/admin/login';
+    } else if (role === 'employer') {
+      endpoint = '/employers/login';
+    } else {
+      endpoint = '/jobseekers/login';
+    }
 
-    setUser(data);
-    localStorage.setItem('jobConnectUser', JSON.stringify(data));
-    return data;
+    const { data } = await apiClient.post(endpoint, { email, password });
+    const userWithRole = { ...data, role }; // ✅ attach role manually
+    setUser(userWithRole);
+    localStorage.setItem('jobConnectUser', JSON.stringify(userWithRole));
+    return userWithRole;
   };
 
-  /**
-   * Universal Registration
-   * Handles Jobseekers, Employers, and Admin
-   */
-  const register = async (formData, isAdmin = false) => {
-    const endpoint = isAdmin ? '/admin/register' : '/users/register';
-    const { data } = await apiClient.post(endpoint, formData);
+  const register = async (formData, role = 'jobseeker') => {
+    let endpoint;
+    if (role === 'admin') {
+      endpoint = '/admin/register';
+    } else if (role === 'employer') {
+      endpoint = '/employers/register';
+    } else {
+      endpoint = '/jobseekers/register';
+    }
 
-    setUser(data);
-    localStorage.setItem('jobConnectUser', JSON.stringify(data));
-    return data;
+    const { data } = await apiClient.post(endpoint, formData);
+    const userWithRole = { ...data, role }; // ✅ attach role manually
+    setUser(userWithRole);
+    localStorage.setItem('jobConnectUser', JSON.stringify(userWithRole));
+    return userWithRole;
   };
 
   const logout = () => {
@@ -51,24 +59,24 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('jobConnectUser');
   };
 
-  // Helper values for easy use in Components (like Navbar)
-  const role = (user?.roles || user?.accountType)?.toLowerCase();
+  // ✅ now role is always defined
+  const role = user?.role;
   const isCompanyAdmin = role === 'admin';
   const isEmployer = role === 'employer';
   const isJobseeker = role === 'jobseeker';
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      register, 
-      logout, 
+    <AuthContext.Provider value={{
+      user,
+      login,
+      register,
+      logout,
       loading,
       role,
       isCompanyAdmin,
       isEmployer,
       isJobseeker,
-      employerId: user?.employerId || user?.employer 
+      employerId: user?.employerId || user?.employer
     }}>
       {!loading && children}
     </AuthContext.Provider>

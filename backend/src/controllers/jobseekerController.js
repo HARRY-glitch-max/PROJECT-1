@@ -1,96 +1,86 @@
-import User from "../models/User.js";
+import User from "../models/Jobseeker.js";
 import generateToken from "../utils/generateToken.js";
 import { notifyJobseeker } from "../utils/notifyJobseeker.js";
 
 // =======================
-// Register user
+// Register jobseeker
 // =======================
 export const registerUser = async (req, res) => {
   try {
-    let { name, email, password, roles } = req.body;
+    let { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+      return res.status(400).json({ message: "Please provide name, email, and password." });
     }
 
-    // ✅ Normalize email
+    if (typeof email !== "string") {
+      return res.status(400).json({ message: "Email must be a string." });
+    }
+
     email = email.toLowerCase();
 
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({ message: "User already exists." });
     }
 
-    const user = await User.create({ name, email, password, roles });
+    const user = await User.create({ name, email, password });
 
     res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
-      roles: user.roles,
       token: generateToken(user._id),
     });
 
   } catch (err) {
     console.error("REGISTER ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error during registration." });
   }
 };
 
 // =======================
-// Login user (FIXED 🔥)
+// Login jobseeker
 // =======================
 export const loginUser = async (req, res) => {
   try {
     let { email, password } = req.body;
 
-    console.log("BODY:", req.body);
-
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({ message: "Both email and password are required." });
     }
 
-    // ✅ Normalize email
-    email = email.toLowerCase();
+    if (typeof email !== "string") {
+      return res.status(400).json({ message: "Email must be a string." });
+    }
 
+    email = email.toLowerCase();
     const user = await User.findOne({ email });
 
-    console.log("USER:", user);
-
-    // ✅ FIX: Handle user not found FIRST
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    // ✅ Extra safety check
-    if (!user.matchPassword) {
-      throw new Error("matchPassword method not defined");
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
     const isMatch = await user.matchPassword(password);
-
-    console.log("MATCH:", isMatch);
-
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
     res.json({
       _id: user._id,
       name: user.name,
       email: user.email,
-      roles: user.roles,
       token: generateToken(user._id),
     });
 
   } catch (err) {
-    console.error("🔥 LOGIN ERROR:", err);
-    res.status(500).json({ message: err.message });
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ message: "Server error during login." });
   }
 };
 
 // =======================
-// Get all users (admin)
+// Get all jobseekers
 // =======================
 export const getUsers = async (req, res) => {
   try {
@@ -98,55 +88,47 @@ export const getUsers = async (req, res) => {
     res.json(users);
   } catch (err) {
     console.error("GET USERS ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error fetching users." });
   }
 };
 
 // =======================
-// Get user by ID
+// Get jobseeker by ID
 // =======================
 export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
 
     res.json(user);
 
   } catch (err) {
     console.error("GET USER ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error fetching user." });
   }
 };
 
 // =======================
-// Update user profile
+// Update jobseeker profile
 // =======================
 export const updateUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
 
     user.name = req.body.name || user.name;
-    user.email = req.body.email
+    user.email = req.body.email && typeof req.body.email === "string"
       ? req.body.email.toLowerCase()
       : user.email;
-
-    if (user.roles === "jobseeker") {
-      user.bio = req.body.bio || user.bio;
-      user.skills = req.body.skills || user.skills;
-      user.cv = req.body.cv || user.cv;
-    }
-
-    if (user.roles === "employer") {
-      user.company = req.body.company || user.company;
-      user.industry = req.body.industry || user.industry;
-    }
+    user.bio = req.body.bio || user.bio;
+    user.skills = req.body.skills || user.skills;
+    user.cv = req.body.cv || user.cv;
 
     const updatedUser = await user.save();
 
@@ -154,7 +136,6 @@ export const updateUser = async (req, res) => {
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
-      roles: updatedUser.roles,
       bio: updatedUser.bio,
       skills: updatedUser.skills,
       cv: updatedUser.cv,
@@ -162,45 +143,45 @@ export const updateUser = async (req, res) => {
 
   } catch (err) {
     console.error("UPDATE USER ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error updating user." });
   }
 };
 
 // =======================
-// Delete user
+// Delete jobseeker
 // =======================
 export const deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
 
-    res.json({ message: "User deleted successfully" });
+    res.json({ message: "User deleted successfully." });
 
   } catch (err) {
     console.error("DELETE USER ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error deleting user." });
   }
 };
 
 // =======================
-// Get logged-in profile
+// Get logged-in jobseeker profile
 // =======================
 export const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
 
     res.json(user);
 
   } catch (err) {
     console.error("PROFILE ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error fetching profile." });
   }
 };
 
@@ -214,8 +195,8 @@ export const notifyJobseekerById = async (req, res) => {
 
     const user = await User.findById(id).select("-password");
 
-    if (!user || user.roles !== "jobseeker") {
-      return res.status(404).json({ message: "Jobseeker not found" });
+    if (!user) {
+      return res.status(404).json({ message: "Jobseeker not found." });
     }
 
     await notifyJobseeker({
@@ -232,6 +213,6 @@ export const notifyJobseekerById = async (req, res) => {
 
   } catch (err) {
     console.error("NOTIFY ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error sending notification." });
   }
 };
