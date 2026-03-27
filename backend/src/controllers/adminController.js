@@ -33,7 +33,7 @@ export const registerAdmin = async (req, res) => {
       name: admin.name,
       email: admin.email,
       employerId: admin.employerId,
-      token: generateToken(admin._id),
+      token: generateToken(admin._id, "admin", admin.employerId),
     });
   } catch (error) {
     console.error("REGISTER ADMIN ERROR:", error);
@@ -73,7 +73,7 @@ export const loginAdmin = async (req, res) => {
       name: admin.name,
       email: admin.email,
       employerId: admin.employerId,
-      token: generateToken(admin._id),
+      token: generateToken(admin._id, "admin", admin.employerId),
     });
   } catch (error) {
     console.error("LOGIN ADMIN ERROR:", error);
@@ -86,12 +86,12 @@ export const loginAdmin = async (req, res) => {
 // =======================
 export const getAdminReports = async (req, res) => {
   try {
-    const admin = await Admin.findById(req.user._id);
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found." });
-    }
+    // employerId is now available directly from the token payload
+    const employerId = req.user.employerId;
 
-    const employerId = admin.employerId;
+    if (!employerId) {
+      return res.status(400).json({ message: "Employer ID missing in token." });
+    }
 
     const [
       totalJobs, activeJobs, closedJobs,

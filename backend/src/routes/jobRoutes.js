@@ -13,7 +13,7 @@ const router = express.Router();
 router.post("/", createJob);
 
 // Get all jobs
-router.get("/", getJobs);
+//router.get("/", getJobs);
 
 // Get job by ID
 router.get("/:id", getJobById);

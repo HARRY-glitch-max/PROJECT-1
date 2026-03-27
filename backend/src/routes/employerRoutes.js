@@ -6,8 +6,8 @@ import {
   getEmployerById,
   updateEmployer,
   deleteEmployer,
-  shortlistCandidate
-} from "../controllers/employerController.js";
+} from "../controllers/employerController.js"; // 👈 only employer-specific functions
+import { shortlistCandidate } from "../controllers/applicationController.js"; // 👈 import from the right place
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();

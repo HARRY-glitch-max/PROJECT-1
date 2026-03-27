@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useContext } from "react";
 import {
   BrowserRouter as Router,
@@ -13,19 +12,23 @@ import Navbar from "./components/layout/Navbar";
 
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
-import Chat from "./pages/Chat";
+
+// Chat page (shared between employer & jobseeker)
+import ChatPage from "./pages/ChatPage";
 
 // Role-specific pages
 import JobseekerLogin from "./pages/JobseekerLogin";
 import JobseekerRegister from "./pages/JobseekerRegister";
 import JobseekerProfile from "./pages/JobseekerProfile";
 import JobseekerDashboard from "./pages/JobseekerDashboard";
+import ApplyJob from "./pages/ApplyJob";
 
 import EmployerLogin from "./pages/EmployerLogin";
 import EmployerRegister from "./pages/EmployerRegister";
 import EmployerProfile from "./pages/EmployerProfile";
 import EmployerDashboard from "./pages/EmployerDashboard";
 import PostJob from "./pages/PostJob";
+import EmployerApplications from "./pages/EmployerApplications";
 
 import AdminLogin from "./pages/AdminLogin";
 import AdminRegister from "./pages/AdminRegister";
@@ -36,7 +39,6 @@ const AppContent = () => {
   const { loading, user, role } = useContext(AuthContext);
   const location = useLocation();
 
-  // Hide Navbar when inside employer or admin dashboards
   const hideNavbar =
     location.pathname.startsWith("/employer/dashboard") ||
     location.pathname.startsWith("/admin/dashboard") ||
@@ -59,14 +61,14 @@ const AppContent = () => {
       <main>
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Home key={location.pathname} />} />
 
           {/* Jobseeker routes */}
           <Route
             path="/jobseeker/login"
             element={
               !isAuthenticated ? (
-                <JobseekerLogin />
+                <JobseekerLogin key={location.pathname} />
               ) : (
                 <Navigate to="/jobseeker/dashboard" replace />
               )
@@ -76,7 +78,7 @@ const AppContent = () => {
             path="/jobseeker/register"
             element={
               !isAuthenticated ? (
-                <JobseekerRegister />
+                <JobseekerRegister key={location.pathname} />
               ) : (
                 <Navigate to="/jobseeker/dashboard" replace />
               )
@@ -86,7 +88,17 @@ const AppContent = () => {
             path="/jobs"
             element={
               isAuthenticated && role === "jobseeker" ? (
-                <Jobs />
+                <Jobs key={location.pathname} />
+              ) : (
+                <Navigate to="/jobseeker/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/jobs/:jobId/apply"
+            element={
+              isAuthenticated && role === "jobseeker" ? (
+                <ApplyJob key={location.pathname} />
               ) : (
                 <Navigate to="/jobseeker/login" replace />
               )
@@ -96,7 +108,7 @@ const AppContent = () => {
             path="/jobseeker/profile"
             element={
               isAuthenticated && role === "jobseeker" ? (
-                <JobseekerProfile />
+                <JobseekerProfile key={location.pathname} />
               ) : (
                 <Navigate to="/jobseeker/login" replace />
               )
@@ -106,7 +118,7 @@ const AppContent = () => {
             path="/jobseeker/dashboard/*"
             element={
               isAuthenticated && role === "jobseeker" ? (
-                <JobseekerDashboard />
+                <JobseekerDashboard key={location.pathname} />
               ) : (
                 <Navigate to="/jobseeker/login" replace />
               )
@@ -118,7 +130,7 @@ const AppContent = () => {
             path="/employer/login"
             element={
               !isAuthenticated ? (
-                <EmployerLogin />
+                <EmployerLogin key={location.pathname} />
               ) : (
                 <Navigate to="/employer/dashboard" replace />
               )
@@ -128,7 +140,7 @@ const AppContent = () => {
             path="/employer/register"
             element={
               !isAuthenticated ? (
-                <EmployerRegister />
+                <EmployerRegister key={location.pathname} />
               ) : (
                 <Navigate to="/employer/dashboard" replace />
               )
@@ -138,7 +150,7 @@ const AppContent = () => {
             path="/employer/profile"
             element={
               isAuthenticated && role === "employer" ? (
-                <EmployerProfile />
+                <EmployerProfile key={location.pathname} />
               ) : (
                 <Navigate to="/employer/login" replace />
               )
@@ -148,7 +160,17 @@ const AppContent = () => {
             path="/jobs/create"
             element={
               isAuthenticated && role === "employer" ? (
-                <PostJob />
+                <PostJob key={location.pathname} />
+              ) : (
+                <Navigate to="/employer/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/employer/dashboard/applications"
+            element={
+              isAuthenticated && role === "employer" ? (
+                <EmployerApplications key={location.pathname} />
               ) : (
                 <Navigate to="/employer/login" replace />
               )
@@ -158,7 +180,7 @@ const AppContent = () => {
             path="/employer/dashboard/*"
             element={
               isAuthenticated && role === "employer" ? (
-                <EmployerDashboard />
+                <EmployerDashboard key={location.pathname} />
               ) : (
                 <Navigate to="/employer/login" replace />
               )
@@ -170,7 +192,7 @@ const AppContent = () => {
             path="/admin/login"
             element={
               !isAuthenticated ? (
-                <AdminLogin />
+                <AdminLogin key={location.pathname} />
               ) : (
                 <Navigate to="/admin/dashboard" replace />
               )
@@ -180,7 +202,7 @@ const AppContent = () => {
             path="/admin/register"
             element={
               !isAuthenticated ? (
-                <AdminRegister />
+                <AdminRegister key={location.pathname} />
               ) : (
                 <Navigate to="/admin/dashboard" replace />
               )
@@ -190,7 +212,7 @@ const AppContent = () => {
             path="/admin/profile"
             element={
               isAuthenticated && role === "admin" ? (
-                <AdminProfile />
+                <AdminProfile key={location.pathname} />
               ) : (
                 <Navigate to="/admin/login" replace />
               )
@@ -200,17 +222,23 @@ const AppContent = () => {
             path="/admin/dashboard/*"
             element={
               isAuthenticated && role === "admin" ? (
-                <AdminDashboard />
+                <AdminDashboard key={location.pathname} />
               ) : (
                 <Navigate to="/admin/login" replace />
               )
             }
           />
 
-          {/* Shared route */}
+          {/* Shared Chat route */}
           <Route
             path="/chat"
-            element={isAuthenticated ? <Chat /> : <Navigate to="/jobseeker/login" replace />}
+            element={
+              isAuthenticated ? (
+                <ChatPage key={location.pathname} />
+              ) : (
+                <Navigate to="/jobseeker/login" replace />
+              )
+            }
           />
 
           {/* Catch-all */}

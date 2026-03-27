@@ -1,13 +1,24 @@
-import apiClient from './client';
+import apiClient from "./client";
 
-// Fetch all conversations for the sidebar
-export const getConversations = async () => {
-  const { data } = await apiClient.get('/chat/conversations');
+// Fetch all chats for a user (inbox style, for sidebar)
+export const getUserChats = async (userId) => {
+  const { data } = await apiClient.get(`/chats/user/${userId}`);
   return data;
 };
 
-// Fetch messages for a specific chat
-export const getMessages = async (receiverId) => {
-  const { data } = await apiClient.get(`/chat/messages/${receiverId}`);
+// Fetch messages between two users (conversation view)
+export const getChatHistory = async (senderId, receiverId) => {
+  const { data } = await apiClient.get(
+    `/chats/history/${senderId}/${receiverId}`
+  );
+  return data;
+};
+
+// ✅ Alias for getChatHistory so ChatPage.jsx can import getMessages
+export const getMessages = getChatHistory;
+
+// Send a new message
+export const sendMessage = async (payload) => {
+  const { data } = await apiClient.post("/chats", payload);
   return data;
 };

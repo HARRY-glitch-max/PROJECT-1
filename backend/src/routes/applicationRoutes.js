@@ -1,25 +1,23 @@
 import express from "express";
-import uploadModule from "../middleware/multer.js"; // CommonJS interop
+import upload from "../middleware/multer.js"; // Multer for file uploads
 import {
   createApplication,
   getApplications,
   getApplicationsByJob,
   getApplicationsByUser,
   getApplicationById,
+  getApplicationsByEmployer,   // ✅ new controller
   updateApplicationStatus,
   deleteApplication,
-  shortlistCandidate
+  shortlistCandidate,
 } from "../controllers/applicationController.js";
 
 const router = express.Router();
 
-// Normalize CommonJS export
-const upload = uploadModule.default || uploadModule;
-
 /**
  * --- 📄 Application Submission ---
- * Added upload.single("resume") middleware.
- * "resume" is the field name you must use in Postman (form-data).
+ * Multer middleware parses the file before hitting the controller.
+ * "resume" must match the frontend FormData field name.
  */
 router.post("/", upload.single("resume"), createApplication);
 
@@ -27,6 +25,7 @@ router.post("/", upload.single("resume"), createApplication);
 router.get("/", getApplications);
 router.get("/job/:jobId", getApplicationsByJob);
 router.get("/user/:userId", getApplicationsByUser);
+router.get("/employer/:employerId", getApplicationsByEmployer); // ✅ new route
 router.get("/:id", getApplicationById);
 
 // --- ⚙️ Management Routes ---

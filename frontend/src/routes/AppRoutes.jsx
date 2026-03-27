@@ -1,9 +1,13 @@
+// src/routes/AppRoutes.jsx
 import { Routes, Route } from "react-router-dom";
 import Home from "../pages/Home";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import ApplyJob from "../pages/ApplyJob";
 import MyApplications from "../pages/MyApplications";
+import EmployerDashboard from "../pages/EmployerDashboard";
+import AdminDashboard from "../pages/AdminDashboard";
+import AdminReports from "../pages/AdminReports";
 import ProtectedRoute from "../components/ProtectedRoute";
 
 const AppRoutes = () => {
@@ -35,10 +39,10 @@ const AppRoutes = () => {
 
       {/* Employer dashboard */}
       <Route
-        path="/employer/dashboard"
+        path="/employer/dashboard/*"
         element={
           <ProtectedRoute allowedRoles={["employer"]}>
-            <div>Employer Dashboard</div>
+            <EmployerDashboard />
           </ProtectedRoute>
         }
       />
@@ -48,7 +52,17 @@ const AppRoutes = () => {
         path="/admin/dashboard"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
-            <div>Admin Dashboard</div>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin reports */}
+      <Route
+        path="/admin/reports"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminReports />
           </ProtectedRoute>
         }
       />

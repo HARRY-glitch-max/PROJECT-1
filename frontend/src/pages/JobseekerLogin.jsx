@@ -3,12 +3,12 @@ import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { loginJobseeker } from "../services/api";   // ✅ calls /api/jobseekers/login
+import { loginJobseeker } from "../services/api";   // calls /api/jobseekers/login
 import { AuthContext } from "../contexts/AuthContext";
 
 export default function JobseekerLogin() {
   const navigate = useNavigate();
-  const { login: setAuth } = useContext(AuthContext);
+  const { setAuthUser } = useContext(AuthContext);  // use pure setter
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -26,12 +26,12 @@ export default function JobseekerLogin() {
 
     try {
       const res = await loginJobseeker(formData);
+      console.log("Jobseeker login response:", res.data);
 
-      // Save user + token locally
-      localStorage.setItem("jobConnectUser", JSON.stringify(res.data));
-      setAuth(res.data, res.data.token);
+      // ✅ Update context state directly
+      setAuthUser({ ...res.data, role: "jobseeker" });
 
-      // Redirect directly to jobseeker dashboard
+      // ✅ Redirect to jobseeker dashboard (not Home)
       navigate("/jobseeker/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed. Please try again.");
@@ -57,6 +57,7 @@ export default function JobseekerLogin() {
           value={formData.email}
           onChange={handleChange}
           placeholder="Email"
+          autoComplete="email"             // ✅ valid autocomplete
           required
         />
         <Input
@@ -65,6 +66,7 @@ export default function JobseekerLogin() {
           value={formData.password}
           onChange={handleChange}
           placeholder="Password"
+          autoComplete="current-password"  // ✅ valid autocomplete
           required
         />
         <Button type="submit" className="w-full" disabled={loading}>

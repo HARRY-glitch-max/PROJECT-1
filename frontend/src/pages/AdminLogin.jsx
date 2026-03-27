@@ -3,12 +3,12 @@ import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { loginAdmin } from "../services/api"; // ✅ correct import
+import { loginAdmin } from "../services/api"; // calls /api/admin/login
 import { AuthContext } from "../contexts/AuthContext";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { login: setAuth } = useContext(AuthContext);
+  const { setAuthUser } = useContext(AuthContext); 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,11 +22,13 @@ export default function AdminLogin() {
     setError("");
 
     try {
-      const res = await loginAdmin(formData); // ✅ calls /api/admin/login
-      localStorage.setItem("jobConnectUser", JSON.stringify(res.data));
-      setAuth(res.data, res.data.token);
+      const res = await loginAdmin(formData); // hits /api/admin/login
+      console.log("Admin login response:", res.data);
 
-      // ✅ backend doesn’t return roles, so we hardcode admin here
+      // ✅ Update global AuthContext directly
+      setAuthUser({ ...res.data, role: "admin" });
+
+      // ✅ Redirect to admin dashboard (not Home)
       navigate("/admin/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
@@ -46,6 +48,7 @@ export default function AdminLogin() {
           value={formData.email}
           onChange={handleChange}
           placeholder="Email"
+          autoComplete="email"          // ✅ valid autocomplete
           required
         />
         <Input
@@ -54,6 +57,7 @@ export default function AdminLogin() {
           value={formData.password}
           onChange={handleChange}
           placeholder="Password"
+          autoComplete="current-password" // ✅ valid autocomplete
           required
         />
         <Button type="submit" className="w-full" disabled={loading}>

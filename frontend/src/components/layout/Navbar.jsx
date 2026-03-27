@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../contexts/ThemeContext";
-import { Briefcase, Home, LogIn, UserPlus, LogOut, Sun, Moon } from "lucide-react";
+import { Briefcase, Home, LogIn, UserPlus, LogOut, Sun, Moon, RefreshCcw } from "lucide-react";
 import Button from "../ui/Button";
 
 const Navbar = () => {
@@ -20,6 +20,11 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     navigate("/");
+  };
+
+  const handleReload = () => {
+    // Default: full page reload
+    window.location.reload();
   };
 
   // Close dropdown when clicking outside
@@ -72,6 +77,15 @@ const Navbar = () => {
             className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
+          {/* Reload Button */}
+          <button 
+            onClick={handleReload}
+            className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+            title="Reload"
+          >
+            <RefreshCcw size={20} />
           </button>
 
           {!user ? (

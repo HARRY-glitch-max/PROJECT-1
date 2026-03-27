@@ -1,45 +1,42 @@
 import axios from 'axios';
 
+/**
+ * Axios instance for all API requests
+ * Vite's proxy will forward requests starting with "/api" to http://localhost:5000/api
+ */
 const apiClient = axios.create({
-  /**
-   * ✅ Use a relative path now! 
-   * Vite's proxy in vite.config.js will automatically forward 
-   * any request starting with "/api" to http://127.0.0.1:5000/api
-   */
-  baseURL: '/api', 
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: '/api',
+  // ❌ Remove the default Content-Type
 });
 
-// Request Interceptor: Attach Token for Jeremiah, Henry, and Employers
+/**
+ * Request Interceptor
+ * Attaches Authorization header if user is logged in
+ */
 apiClient.interceptors.request.use(
   (config) => {
-    // Retrieve user data from localStorage
     const user = JSON.parse(localStorage.getItem('jobConnectUser'));
-    
+
     if (user?.token) {
-      // ✅ Attach the Bearer token to authorize protected routes
       config.headers.Authorization = `Bearer ${user.token}`;
     }
-    
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 /**
- * Optional: Response Interceptor 
- * Logs the user out if the token expires (401 Unauthorized)
+ * Response Interceptor
+ * Logs user out if 401 Unauthorized
  */
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('jobConnectUser');
-      // window.location.href = '/login'; // Optional: Redirect to login
+      // Optional: redirect to login page
+      // window.location.href = '/login';
     }
     return Promise.reject(error);
   }

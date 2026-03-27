@@ -1,76 +1,66 @@
 // src/pages/AdminDashboard.jsx
-import { useEffect, useState } from "react";
+import { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/ui/Button";
-import { getAdminReports } from "../services/api"; // ✅ backend reports endpoint
 import { AuthContext } from "../contexts/AuthContext";
-import { useContext } from "react";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
-
-  const [reports, setReports] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const res = await getAdminReports(); // ✅ calls /api/admin/reports
-        setReports(res.data);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load reports");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReports();
-  }, []);
-
-  if (loading) return <p>Loading dashboard...</p>;
-  if (error) return <p className="text-red-600">{error}</p>;
+  const { user, role, logout } = useContext(AuthContext);
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 bg-white shadow-md p-6 rounded">
-      <h2 className="text-2xl font-bold text-blue-700 mb-6">
-        Admin Dashboard
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Jobs Section */}
-        <div className="p-4 border rounded">
-          <h3 className="font-semibold mb-2">Jobs</h3>
-          <p>Total: {reports.jobs.total}</p>
-          <p>Active: {reports.jobs.active}</p>
-          <p>Closed: {reports.jobs.closed}</p>
+    <div className="min-h-screen bg-gray-100 py-10 px-6">
+      <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-lg p-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-3xl font-bold text-blue-700">Admin Dashboard</h2>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-500">
+              Logged in as <strong>{user?.name}</strong> ({role})
+            </span>
+            <Button
+              onClick={logout}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Logout
+            </Button>
+          </div>
         </div>
 
-        {/* Applications Section */}
-        <div className="p-4 border rounded">
-          <h3 className="font-semibold mb-2">Applications</h3>
-          <p>Total: {reports.applications.total}</p>
-          <p>Shortlisted: {reports.applications.shortlisted}</p>
-          <p>Hired: {reports.applications.hired}</p>
-          <p>Rejected: {reports.applications.rejected}</p>
-          <p>Pending: {reports.applications.pending}</p>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center hover:shadow-md transition">
+            <h3 className="text-lg font-semibold text-blue-700 mb-2">Profile</h3>
+            <p className="text-gray-600 mb-4">
+              Manage your admin profile details.
+            </p>
+            <Button onClick={() => navigate("/admin/profile")}>
+              Go to Profile
+            </Button>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center hover:shadow-md transition">
+            <h3 className="text-lg font-semibold text-green-700 mb-2">Reports</h3>
+            <p className="text-gray-600 mb-4">
+              View jobs, applications, and interviews reports.
+            </p>
+            <Button onClick={() => navigate("/admin/reports")}>
+              View Reports
+            </Button>
+          </div>
         </div>
 
-        {/* Interviews Section */}
-        <div className="p-4 border rounded">
-          <h3 className="font-semibold mb-2">Interviews</h3>
-          <p>Total: {reports.interviews.total}</p>
-          <p>Completed: {reports.interviews.completed}</p>
-          <p>Scheduled: {reports.interviews.scheduled}</p>
-          <p>Cancelled: {reports.interviews.cancelled}</p>
+        {/* Welcome Section */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">
+            Welcome back!
+          </h3>
+          <p className="text-gray-600">
+            Use the quick actions above to manage your admin tasks. You can
+            update your profile or check reports. This dashboard is designed to
+            give you a clean overview and easy navigation.
+          </p>
         </div>
-      </div>
-
-      <div className="mt-6">
-        <Button onClick={() => navigate("/admin/profile")}>
-          Go to Profile
-        </Button>
       </div>
     </div>
   );

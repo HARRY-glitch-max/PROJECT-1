@@ -24,12 +24,14 @@ const notifyAllJobseekers = async (job, type, message, subject) => {
   }
 };
 
+// =======================
 // Create a new job
+// =======================
 const createJob = async (req, res) => {
   try {
-    const { employerId, title, description, requirements } = req.body;
+    const { employerId, title, description, requirements, location, salary } = req.body;
 
-    const job = new Job({ employerId, title, description, requirements });
+    const job = new Job({ employerId, title, description, requirements, location, salary });
     await job.save();
 
     // 🔔 + 📧 Notify jobseekers
@@ -42,11 +44,14 @@ const createJob = async (req, res) => {
 
     res.status(201).json({ message: "Job created successfully and notifications sent", job });
   } catch (error) {
+    console.error("CREATE JOB ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
+// =======================
 // Get all jobs
+// =======================
 const getJobs = async (req, res) => {
   try {
     const jobs = await Job.find().populate("employerId", "companyName industry");
@@ -56,7 +61,9 @@ const getJobs = async (req, res) => {
   }
 };
 
+// =======================
 // Get job by ID
+// =======================
 const getJobById = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id).populate("employerId", "companyName industry");
@@ -69,7 +76,9 @@ const getJobById = async (req, res) => {
   }
 };
 
+// =======================
 // Update job
+// =======================
 const updateJob = async (req, res) => {
   try {
     const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true })
@@ -93,7 +102,9 @@ const updateJob = async (req, res) => {
   }
 };
 
+// =======================
 // Delete job
+// =======================
 const deleteJob = async (req, res) => {
   try {
     const job = await Job.findByIdAndDelete(req.params.id);

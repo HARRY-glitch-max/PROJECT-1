@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.jsx
-import { createContext, useState, useEffect } from 'react';
-import apiClient from '../api/client';
+import { createContext, useState, useEffect } from "react";
+import apiClient from "../api/client";
 
 export const AuthContext = createContext();
 
@@ -9,75 +9,114 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('jobConnectUser');
+    const savedUser = localStorage.getItem("jobConnectUser");
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
       } catch (error) {
-        localStorage.removeItem('jobConnectUser');
+        localStorage.removeItem("jobConnectUser");
       }
     }
     setLoading(false);
   }, []);
 
-  const login = async (email, password, role = 'jobseeker') => {
+  // ✅ Login (no navigation here)
+  const login = async (email, password, role = "jobseeker") => {
     let endpoint;
-    if (role === 'admin') {
-      endpoint = '/admin/login';
-    } else if (role === 'employer') {
-      endpoint = '/employers/login';
+    if (role === "admin") {
+      endpoint = "/admin/login";
+    } else if (role === "employer") {
+      endpoint = "/employers/login";
     } else {
-      endpoint = '/jobseekers/login';
+      endpoint = "/jobseekers/login";
     }
 
-    const { data } = await apiClient.post(endpoint, { email, password });
-    const userWithRole = { ...data, role }; // ✅ attach role manually
-    setUser(userWithRole);
-    localStorage.setItem('jobConnectUser', JSON.stringify(userWithRole));
-    return userWithRole;
+    try {
+      const { data } = await apiClient.post(endpoint, { email, password, role });
+
+      const userWithRole = {
+        ...data,
+        role,
+        employerId: data.employerId || data._id || data.id,
+      };
+
+      setUser(userWithRole);
+      localStorage.setItem("jobConnectUser", JSON.stringify(userWithRole));
+      return userWithRole; // caller handles navigation
+    } catch (err) {
+      console.error("Login failed:", err.response?.data || err.message);
+      throw err;
+    }
   };
 
-  const register = async (formData, role = 'jobseeker') => {
+  // ✅ Register (no navigation here)
+  const register = async (formData, role = "jobseeker") => {
     let endpoint;
-    if (role === 'admin') {
-      endpoint = '/admin/register';
-    } else if (role === 'employer') {
-      endpoint = '/employers/register';
+    if (role === "admin") {
+      endpoint = "/admin/register";
+    } else if (role === "employer") {
+      endpoint = "/employers/register";
     } else {
-      endpoint = '/jobseekers/register';
+      endpoint = "/jobseekers/register";
     }
 
-    const { data } = await apiClient.post(endpoint, formData);
-    const userWithRole = { ...data, role }; // ✅ attach role manually
-    setUser(userWithRole);
-    localStorage.setItem('jobConnectUser', JSON.stringify(userWithRole));
-    return userWithRole;
+    try {
+      const { data } = await apiClient.post(endpoint, { ...formData, role });
+
+      const userWithRole = {
+        ...data,
+        role,
+        employerId: data.employerId || data._id || data.id,
+      };
+
+      setUser(userWithRole);
+      localStorage.setItem("jobConnectUser", JSON.stringify(userWithRole));
+      return userWithRole; // caller handles navigation
+    } catch (err) {
+      console.error("Registration failed:", err.response?.data || err.message);
+      throw err;
+    }
   };
 
+  // ✅ Setter
+  const setAuthUser = (userData) => {
+    const userWithRole = {
+      ...userData,
+      role: userData.role || "jobseeker",
+      employerId: userData.employerId || userData._id || userData.id,
+    };
+    setUser(userWithRole);
+    localStorage.setItem("jobConnectUser", JSON.stringify(userWithRole));
+  };
+
+  // ✅ Logout (no navigation here)
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('jobConnectUser');
+    localStorage.removeItem("jobConnectUser");
+    // caller handles navigation
   };
 
-  // ✅ now role is always defined
   const role = user?.role;
-  const isCompanyAdmin = role === 'admin';
-  const isEmployer = role === 'employer';
-  const isJobseeker = role === 'jobseeker';
+  const isCompanyAdmin = role === "admin";
+  const isEmployer = role === "employer";
+  const isJobseeker = role === "jobseeker";
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      register,
-      logout,
-      loading,
-      role,
-      isCompanyAdmin,
-      isEmployer,
-      isJobseeker,
-      employerId: user?.employerId || user?.employer
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        logout,
+        setAuthUser,
+        loading,
+        role,
+        isCompanyAdmin,
+        isEmployer,
+        isJobseeker,
+        employerId: user?.employerId,
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );

@@ -1,27 +1,41 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  bio: { type: String },
-  skills: [{ type: String }],
-  cv: { type: String } // store CV file path or URL
-}, { timestamps: true });
+const jobseekerSchema = new mongoose.Schema(
+  {
+    // ✅ Core identity fields
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+
+    // ✅ Optional profile fields
+    bio: { type: String },
+    skills: [{ type: String }],
+    cv: { type: String }, // store CV file path or URL
+    avatar: { type: String }, // profile picture URL or file path
+
+    // ✅ Role field for flexibility
+    role: {
+      type: String,
+      enum: ["jobseeker"], // locked to jobseeker for this model
+      default: "jobseeker",
+    },
+  },
+  { timestamps: true }
+);
 
 // ✅ Hash password before saving
-userSchema.pre("save", async function (next) {
+jobseekerSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
 // ✅ Add matchPassword method
-userSchema.methods.matchPassword = async function (enteredPassword) {
+jobseekerSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-const User = mongoose.model("User", userSchema);
+const Jobseeker = mongoose.model("Jobseeker", jobseekerSchema);
 
-export default User;
+export default Jobseeker;

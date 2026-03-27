@@ -3,12 +3,12 @@ import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { loginEmployer } from "../services/api"; // ✅ employer-specific login
+import { loginEmployer } from "../services/api"; // employer-specific login
 import { AuthContext } from "../contexts/AuthContext";
 
 export default function EmployerLogin() {
   const navigate = useNavigate();
-  const { login: setAuth } = useContext(AuthContext);
+  const { setAuthUser } = useContext(AuthContext); // use pure setter
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,16 +22,13 @@ export default function EmployerLogin() {
     setError("");
 
     try {
-      const res = await loginEmployer(formData); // ✅ hits /api/employers/login
+      const res = await loginEmployer(formData); // hits /api/employers/login
       console.log("Employer login response:", res.data);
 
-      // Save to localStorage
-      localStorage.setItem("jobConnectUser", JSON.stringify(res.data));
+      // ✅ Update global AuthContext directly
+      setAuthUser({ ...res.data, role: "employer" });
 
-      // Update global AuthContext
-      setAuth(res.data, res.data.token);
-
-      // ✅ backend doesn’t return roles, so hardcode employer redirect
+      // ✅ Redirect to employer dashboard (not Home)
       navigate("/employer/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
@@ -51,6 +48,7 @@ export default function EmployerLogin() {
           value={formData.email}
           onChange={handleChange}
           placeholder="Email"
+          autoComplete="email"             // ✅ valid autocomplete
           required
         />
         <Input
@@ -59,6 +57,7 @@ export default function EmployerLogin() {
           value={formData.password}
           onChange={handleChange}
           placeholder="Password"
+          autoComplete="current-password"  // ✅ valid autocomplete
           required
         />
         <Button type="submit" className="w-full" disabled={loading}>

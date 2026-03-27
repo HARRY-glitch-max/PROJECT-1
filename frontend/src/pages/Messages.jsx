@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
-import { getMessages, getConversations } from '../api/chat';
+import { getUserChats, getChatHistory, sendMessage } from '../api/chat'; // ✅ include sendMessage
 import { Send, User } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -13,54 +13,65 @@ const Messages = () => {
   const [newMessage, setNewMessage] = useState('');
   const scrollRef = useRef();
 
-  // Load sidebar conversations
+  // Load sidebar conversations (inbox style)
   useEffect(() => {
     const loadChats = async () => {
-      const data = await getConversations();
+      const data = await getUserChats(user._id);
       setConversations(data);
     };
-    loadChats();
-  }, []);
+    if (user?._id) loadChats();
+  }, [user?._id]);
 
   // Load messages when a contact is clicked
   useEffect(() => {
     if (activeChat) {
       const loadMessages = async () => {
-        const data = await getMessages(activeChat._id);
+        const data = await getChatHistory(user._id, activeChat._id);
         setMessages(data);
       };
       loadMessages();
     }
-  }, [activeChat]);
+  }, [activeChat, user._id]);
 
   // Listen for real-time messages via Socket
   useEffect(() => {
     if (socket) {
       socket.on("receive_message", (message) => {
-        if (message.senderId === activeChat?._id || message.senderId === user._id) {
+        if (
+          message.senderId === activeChat?._id ||
+          message.receiverId === activeChat?._id
+        ) {
           setMessages((prev) => [...prev, message]);
         }
       });
     }
     return () => socket?.off("receive_message");
-  }, [socket, activeChat, user._id]);
+  }, [socket, activeChat]);
 
   // Scroll to bottom on new message
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = (e) => {
+  // ✅ Persist + emit new message
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeChat) return;
 
     const messageData = {
       receiverId: activeChat._id,
       senderId: user._id,
-      text: newMessage,
+      message: newMessage, // match backend schema
     };
 
-    socket.emit("send_message", messageData);
+    // Save to DB
+    const savedMsg = await sendMessage(messageData);
+
+    // Emit to socket for real-time delivery
+    socket.emit("send_message", savedMsg);
+
+    // Update local state immediately
+    setMessages((prev) => [...prev, savedMsg]);
     setNewMessage('');
   };
 
@@ -73,9 +84,13 @@ const Messages = () => {
           <div 
             key={conv._id}
             onClick={() => setActiveChat(conv)}
-            className={`p-4 flex items-center gap-3 cursor-pointer hover:bg-blue-50 border-b ${activeChat?._id === conv._id ? 'bg-blue-50 border-r-4 border-r-blue-600' : ''}`}
+            className={`p-4 flex items-center gap-3 cursor-pointer hover:bg-blue-50 border-b ${
+              activeChat?._id === conv._id ? 'bg-blue-50 border-r-4 border-r-blue-600' : ''
+            }`}
           >
-            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center"><User size={20}/></div>
+            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+              <User size={20}/>
+            </div>
             <div className="flex-1 truncate">
               <p className="font-semibold text-sm">{conv.name}</p>
               <p className="text-xs text-slate-500 truncate">{conv.lastMessage}</p>
@@ -89,15 +104,21 @@ const Messages = () => {
         {activeChat ? (
           <>
             <div className="p-4 border-b font-bold flex items-center gap-3 shadow-sm">
-               <div className="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center text-xs">{activeChat.name[0]}</div>
+               <div className="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center text-xs">
+                 {activeChat.name[0]}
+               </div>
                {activeChat.name}
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex ${msg.senderId === user._id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[70%] p-3 rounded-2xl text-sm ${msg.senderId === user._id ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none text-slate-800'}`}>
-                    {msg.text}
+                  <div className={`max-w-[70%] p-3 rounded-2xl text-sm ${
+                    msg.senderId === user._id
+                      ? 'bg-blue-600 text-white rounded-tr-none'
+                      : 'bg-white border rounded-tl-none text-slate-800'
+                  }`}>
+                    {msg.message || msg.text}
                   </div>
                 </div>
               ))}
