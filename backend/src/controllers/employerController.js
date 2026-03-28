@@ -1,5 +1,8 @@
-// controllers/employerController.js
 import Employer from "../models/Employer.js";
+import Job from "../models/Job.js";
+import Interview from "../models/Interview.js";
+// ✅ Import consistently — matches Jobseeker.js model file
+import Jobseeker from "../models/Jobseeker.js";
 import generateToken from "../utils/generateToken.js";
 
 // =======================
@@ -15,13 +18,8 @@ const createEmployer = async (req, res) => {
       });
     }
 
-    if (typeof contactInformation.email !== "string") {
-      return res.status(400).json({ message: "Email must be a string." });
-    }
-
     const email = contactInformation.email.toLowerCase();
     const employerExists = await Employer.findOne({ "contactInformation.email": email });
-
     if (employerExists) {
       return res.status(400).json({ message: "Employer already exists." });
     }
@@ -30,7 +28,7 @@ const createEmployer = async (req, res) => {
       companyName,
       industry,
       contactInformation: { ...contactInformation, email },
-      password, // will be hashed by pre-save hook
+      password,
     });
 
     res.status(201).json({
@@ -52,20 +50,13 @@ const createEmployer = async (req, res) => {
 const loginEmployer = async (req, res) => {
   try {
     let { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ message: "Both email and password are required." });
     }
 
     email = email.toLowerCase();
     const employer = await Employer.findOne({ "contactInformation.email": email });
-
-    if (!employer) {
-      return res.status(401).json({ message: "Invalid email or password." });
-    }
-
-    const isMatch = await employer.matchPassword(password);
-    if (!isMatch) {
+    if (!employer || !(await employer.matchPassword(password))) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
@@ -101,9 +92,7 @@ const getEmployers = async (req, res) => {
 const getEmployerById = async (req, res) => {
   try {
     const employer = await Employer.findById(req.params.id).select("-password");
-    if (!employer) {
-      return res.status(404).json({ message: "Employer not found." });
-    }
+    if (!employer) return res.status(404).json({ message: "Employer not found." });
     res.status(200).json(employer);
   } catch (err) {
     console.error("GET EMPLOYER ERROR:", err);
@@ -117,17 +106,14 @@ const getEmployerById = async (req, res) => {
 const updateEmployer = async (req, res) => {
   try {
     const employer = await Employer.findById(req.params.id);
-    if (!employer) {
-      return res.status(404).json({ message: "Employer not found." });
-    }
+    if (!employer) return res.status(404).json({ message: "Employer not found." });
 
     employer.companyName = req.body.companyName || employer.companyName;
     employer.industry = req.body.industry || employer.industry;
     employer.contactInformation = {
-      email:
-        req.body.contactInformation?.email && typeof req.body.contactInformation.email === "string"
-          ? req.body.contactInformation.email.toLowerCase()
-          : employer.contactInformation.email,
+      email: req.body.contactInformation?.email
+        ? req.body.contactInformation.email.toLowerCase()
+        : employer.contactInformation.email,
       phone: req.body.contactInformation?.phone || employer.contactInformation.phone,
       address: req.body.contactInformation?.address || employer.contactInformation.address,
     };
@@ -135,7 +121,6 @@ const updateEmployer = async (req, res) => {
     if (req.body.password) employer.password = req.body.password;
 
     const updatedEmployer = await employer.save();
-
     res.status(200).json({
       employerId: updatedEmployer._id,
       companyName: updatedEmployer.companyName,
@@ -153,12 +138,9 @@ const updateEmployer = async (req, res) => {
 // =======================
 const deleteEmployer = async (req, res) => {
   try {
-    const employer = await Employer.findById(req.params.id);
-    if (!employer) {
-      return res.status(404).json({ message: "Employer not found." });
-    }
+    const result = await Employer.deleteOne({ _id: req.params.id });
+    if (result.deletedCount === 0) return res.status(404).json({ message: "Employer not found." });
 
-    await employer.remove();
     res.status(200).json({ message: "Employer removed successfully." });
   } catch (err) {
     console.error("DELETE EMPLOYER ERROR:", err);
@@ -167,8 +149,33 @@ const deleteEmployer = async (req, res) => {
 };
 
 // =======================
-// Export all functions
+// Employer Jobs & Interviews
 // =======================
+const getEmployerJobs = async (req, res) => {
+  try {
+    const employerId = req.user?.employerId || req.user?._id || req.params.id;
+    const jobs = await Job.find({ employerId });
+    res.status(200).json(jobs);
+  } catch (err) {
+    console.error("GET EMPLOYER JOBS ERROR:", err);
+    res.status(500).json({ message: "Server error fetching employer jobs." });
+  }
+};
+
+const getEmployerInterviews = async (req, res) => {
+  try {
+    const employerId = req.user?.employerId || req.user?._id || req.params.id;
+    const interviews = await Interview.find({ employerId })
+      .populate("jobId", "title location")
+      .populate("userId", "name email"); // ✅ userId ref should match Jobseeker model
+
+    res.status(200).json(interviews);
+  } catch (err) {
+    console.error("GET EMPLOYER INTERVIEWS ERROR:", err);
+    res.status(500).json({ message: "Server error fetching employer interviews." });
+  }
+};
+
 export {
   createEmployer,
   loginEmployer,
@@ -176,4 +183,6 @@ export {
   getEmployerById,
   updateEmployer,
   deleteEmployer,
+  getEmployerJobs,
+  getEmployerInterviews,
 };

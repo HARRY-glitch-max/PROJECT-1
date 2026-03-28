@@ -75,7 +75,6 @@ export const getJobById = (jobId) => API.get(`/jobs/${jobId}`);
 export const applyToJob = (jobId, data) => API.post(`/jobs/${jobId}/apply`, data);
 export const createJob = (data) => API.post("/jobs", data);
 
-// 👇 Added for employer job management
 export const updateJob = (jobId, data) => API.put(`/jobs/${jobId}`, data);
 export const deleteJob = (jobId) => API.delete(`/jobs/${jobId}`);
 
@@ -92,6 +91,10 @@ export const getApplications = () => API.get("/applications");
 export const getApplicationById = (appId) => API.get(`/applications/${appId}`);
 export const withdrawApplication = (appId) => API.delete(`/applications/${appId}`);
 
+// ✅ Employer applications (shortlisted candidates etc.)
+export const getEmployerApplications = (employerId) =>
+  API.get(`/applications/employer/${employerId}`);
+
 // =======================
 // Chat Endpoints
 // =======================
@@ -107,5 +110,11 @@ export const scheduleInterview = (jobId, data) => API.post(`/jobs/${jobId}/inter
 export const getInterviews = () => API.get("/interviews");
 export const cancelInterview = (interviewId) => API.delete(`/interviews/${interviewId}`);
 export const getEmployerInterviews = () => API.get("/employers/interviews");
+
+// =======================
+// Notifications Endpoints
+// =======================
+export const getNotifications = () => API.get("/notifications");
+export const markNotificationRead = (id) => API.put(`/notifications/${id}/read`);
 
 export default API;

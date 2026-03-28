@@ -8,7 +8,7 @@ const adminSchema = new mongoose.Schema({
   employerId: { type: mongoose.Schema.Types.ObjectId, ref: "Employer", required: true }
 });
 
-// Hash password before saving (async/await style, no next)
+// ✅ Hash password before saving
 adminSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
 
@@ -16,11 +16,13 @@ adminSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Compare entered password with hashed password
+// ✅ Compare entered password with hashed password
 adminSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-const Admin = mongoose.model("Admin", adminSchema);
+// ✅ Prevent OverwriteModelError
+const Admin =
+  mongoose.models.Admin || mongoose.model("Admin", adminSchema);
 
 export default Admin;

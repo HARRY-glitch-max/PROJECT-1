@@ -1,20 +1,22 @@
+// controllers/jobController.js
 import Job from "../models/Job.js";
 import Notification from "../models/Notification.js";
-import User from "../models/Jobseeker.js"; // assuming jobseekers are stored in User model
+import User from "../models/Jobseeker.js"; // jobseekers
+import Interview from "../models/Interview.js";
 import { notifyJobseeker } from "../utils/notifyJobseeker.js";
 
-// Helper to notify all jobseekers
+// =======================
+// Helper: Notify all jobseekers
+// =======================
 const notifyAllJobseekers = async (job, type, message, subject) => {
-  const jobseekers = await User.find({}, "name email"); // adjust query to target specific jobseekers
+  const jobseekers = await User.find({}, "name email");
   for (const seeker of jobseekers) {
-    // 🔔 Save notification in DB
     await Notification.create({
       userId: seeker._id,
       type,
       content: message,
     });
 
-    // 📧 Send email
     await notifyJobseeker({
       email: seeker.email,
       name: seeker.name,
@@ -34,7 +36,6 @@ const createJob = async (req, res) => {
     const job = new Job({ employerId, title, description, requirements, location, salary });
     await job.save();
 
-    // 🔔 + 📧 Notify jobseekers
     await notifyAllJobseekers(
       job,
       "job_posting",
@@ -62,14 +63,27 @@ const getJobs = async (req, res) => {
 };
 
 // =======================
+// Get jobs by employer
+// =======================
+const getJobsByEmployer = async (req, res) => {
+  try {
+    const jobs = await Job.find({ employerId: req.params.employerId }).populate(
+      "employerId",
+      "companyName industry"
+    );
+    res.json(jobs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// =======================
 // Get job by ID
 // =======================
 const getJobById = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id).populate("employerId", "companyName industry");
-    if (!job) {
-      return res.status(404).json({ message: "Job not found" });
-    }
+    if (!job) return res.status(404).json({ message: "Job not found" });
     res.json(job);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -81,14 +95,13 @@ const getJobById = async (req, res) => {
 // =======================
 const updateJob = async (req, res) => {
   try {
-    const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true })
-      .populate("employerId", "companyName");
+    const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate(
+      "employerId",
+      "companyName"
+    );
 
-    if (!job) {
-      return res.status(404).json({ message: "Job not found" });
-    }
+    if (!job) return res.status(404).json({ message: "Job not found" });
 
-    // 🔔 + 📧 Notify jobseekers
     await notifyAllJobseekers(
       job,
       "job_update",
@@ -108,11 +121,8 @@ const updateJob = async (req, res) => {
 const deleteJob = async (req, res) => {
   try {
     const job = await Job.findByIdAndDelete(req.params.id);
-    if (!job) {
-      return res.status(404).json({ message: "Job not found" });
-    }
+    if (!job) return res.status(404).json({ message: "Job not found" });
 
-    // 🔔 + 📧 Notify jobseekers
     await notifyAllJobseekers(
       job,
       "job_delete",
@@ -126,11 +136,73 @@ const deleteJob = async (req, res) => {
   }
 };
 
+// =======================
+// Interview Routes
+// =======================
+
+// Schedule a new interview for a job
+const scheduleInterview = async (req, res) => {
+  const { jobId } = req.params;
+  const { applicantId, date, time } = req.body;
+
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    const interview = await Interview.create({
+      jobId,
+      applicantId,
+      date,
+      time,
+    });
+
+    // Notify applicant
+    const applicant = await User.findById(applicantId);
+    if (applicant) {
+      await Notification.create({
+        userId: applicant._id,
+        type: "interview",
+        content: `You have an interview scheduled for "${job.title}" on ${date} at ${time}.`,
+      });
+
+      await notifyJobseeker({
+        email: applicant.email,
+        name: applicant.name,
+        subject: "Interview Scheduled",
+        message: `You have an interview scheduled for "${job.title}" on ${date} at ${time}.`,
+      });
+    }
+
+    res.status(201).json(interview);
+  } catch (error) {
+    console.error("SCHEDULE INTERVIEW ERROR:", error);
+    res.status(500).json({ message: "Failed to schedule interview" });
+  }
+};
+
+// Get all interviews for a job
+const getInterviewsForJob = async (req, res) => {
+  const { jobId } = req.params;
+  try {
+    const interviews = await Interview.find({ jobId }).populate(
+      "applicantId",
+      "name email"
+    );
+    res.status(200).json(interviews);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch interviews" });
+  }
+};
+
 // ✅ Export all functions
 export {
   createJob,
   getJobs,
+  getJobsByEmployer,
   getJobById,
   updateJob,
-  deleteJob
+  deleteJob,
+  scheduleInterview,
+  getInterviewsForJob,
 };

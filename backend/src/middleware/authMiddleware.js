@@ -14,35 +14,30 @@ export const protect = async (req, res, next) => {
 
     let account;
 
-    // 🔥 Only use role for Admin
+    // 🔥 Admins
     if (decoded.role === "admin") {
       account = await Admin.findById(decoded.id).select("-password");
-
       if (!account) {
         return res.status(401).json({ message: "Admin not found" });
       }
-
       req.user = account;
       req.user.accountType = "admin";
       req.user.employerId = account.employerId;
-
       return next();
     }
 
-    // 🔄 For non-admins, detect automatically
+    // 🔄 Jobseekers or Employers
     const [user, employer] = await Promise.all([
       User.findById(decoded.id).select("-password"),
       Employer.findById(decoded.id).select("-password"),
     ]);
 
     account = user || employer;
-
     if (!account) {
       return res.status(401).json({ message: "Not authorized, account not found" });
     }
 
     req.user = account;
-
     if (employer) {
       req.user.accountType = "employer";
       req.user.employerId = employer._id;

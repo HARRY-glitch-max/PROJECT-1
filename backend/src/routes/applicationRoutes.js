@@ -1,23 +1,26 @@
 import express from "express";
-import upload from "../middleware/multer.js"; // Multer for file uploads
+import upload from "../middleware/multer.js";
 import {
   createApplication,
   getApplications,
   getApplicationsByJob,
   getApplicationsByUser,
   getApplicationById,
-  getApplicationsByEmployer,   // ✅ new controller
+  getApplicationsByEmployer,
   updateApplicationStatus,
   deleteApplication,
   shortlistCandidate,
+  checkApplicationStatus, // ✅ Add this import
 } from "../controllers/applicationController.js";
 
 const router = express.Router();
 
+// --- 🛡️ Validation Route ---
+// This is used by the frontend JobCard to toggle between "Apply" and "Chat"
+router.get("/check/:userId/:jobId", checkApplicationStatus);
+
 /**
  * --- 📄 Application Submission ---
- * Multer middleware parses the file before hitting the controller.
- * "resume" must match the frontend FormData field name.
  */
 router.post("/", upload.single("resume"), createApplication);
 
@@ -25,7 +28,7 @@ router.post("/", upload.single("resume"), createApplication);
 router.get("/", getApplications);
 router.get("/job/:jobId", getApplicationsByJob);
 router.get("/user/:userId", getApplicationsByUser);
-router.get("/employer/:employerId", getApplicationsByEmployer); // ✅ new route
+router.get("/employer/:employerId", getApplicationsByEmployer);
 router.get("/:id", getApplicationById);
 
 // --- ⚙️ Management Routes ---

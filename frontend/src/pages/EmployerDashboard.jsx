@@ -1,11 +1,11 @@
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { 
   MessageSquare, PlusCircle, Briefcase, Users, Calendar,
   UserCircle, LogOut, LayoutDashboard, ChevronRight, Bell
 } from "lucide-react";
 
-import Chat from "./ChatPage";
+import ChatPage from "./ChatPage";
 import PostJob from "./PostJob";
 import Interviews from "./Interviews";
 import Jobs from "./Jobs";
@@ -16,9 +16,6 @@ export default function EmployerDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useContext(AuthContext);
-
-  // Track which applicant to chat with
-  const [selectedChatUser, setSelectedChatUser] = useState(null); // { id, name }
 
   const isApplicationsPage = location.pathname.includes("applications");
 
@@ -134,20 +131,11 @@ export default function EmployerDashboard() {
               <Routes>
                 <Route path="/" element={<DefaultOverview />} />
                 <Route path="interviews" element={<Interviews />} />
-                <Route 
-                  path="chat" 
-                  element={
-                    <Chat 
-                      chatId={selectedChatUser ? `${user.id}-${selectedChatUser.id}` : "global"} 
-                      receiverName={selectedChatUser?.name || "Global Chat"} 
-                    />
-                  } 
-                />
+                {/* ✅ Chat route with param */}
+                <Route path="chat/:receiverId" element={<ChatPage />} />
                 <Route path="post-job" element={<PostJob />} />
                 <Route path="my-jobs" element={<Jobs />} />
-                <Route path="applications" element={
-                  <EmployerApplications setSelectedChatUser={setSelectedChatUser} />
-                } />
+                <Route path="applications" element={<EmployerApplications />} />
               </Routes>
             </div>
           </div>

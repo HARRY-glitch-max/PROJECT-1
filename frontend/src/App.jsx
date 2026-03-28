@@ -13,26 +13,24 @@ import Navbar from "./components/layout/Navbar";
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 
-// Chat page (shared between employer & jobseeker)
+// Shared
 import ChatPage from "./pages/ChatPage";
 
-// Role-specific pages
+// Jobseeker
 import JobseekerLogin from "./pages/JobseekerLogin";
 import JobseekerRegister from "./pages/JobseekerRegister";
-import JobseekerProfile from "./pages/JobseekerProfile";
 import JobseekerDashboard from "./pages/JobseekerDashboard";
-import ApplyJob from "./pages/ApplyJob";
+import JobseekerNotifications from "./pages/JobseekerNotifications";
+import JobseekerInterviews from "./pages/JobseekerInterviews";
 
+// Employer
 import EmployerLogin from "./pages/EmployerLogin";
 import EmployerRegister from "./pages/EmployerRegister";
-import EmployerProfile from "./pages/EmployerProfile";
 import EmployerDashboard from "./pages/EmployerDashboard";
-import PostJob from "./pages/PostJob";
-import EmployerApplications from "./pages/EmployerApplications";
 
+// Admin
 import AdminLogin from "./pages/AdminLogin";
 import AdminRegister from "./pages/AdminRegister";
-import AdminProfile from "./pages/AdminProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 
 const AppContent = () => {
@@ -60,188 +58,149 @@ const AppContent = () => {
 
       <main>
         <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Home key={location.pathname} />} />
+          <Route path="/" element={<Home />} />
 
-          {/* Jobseeker routes */}
+          {/* ================= JOBSEEKER ================= */}
+
           <Route
             path="/jobseeker/login"
             element={
               !isAuthenticated ? (
-                <JobseekerLogin key={location.pathname} />
+                <JobseekerLogin />
               ) : (
                 <Navigate to="/jobseeker/dashboard" replace />
               )
             }
           />
+
           <Route
             path="/jobseeker/register"
             element={
               !isAuthenticated ? (
-                <JobseekerRegister key={location.pathname} />
+                <JobseekerRegister />
               ) : (
                 <Navigate to="/jobseeker/dashboard" replace />
               )
             }
           />
-          <Route
-            path="/jobs"
-            element={
-              isAuthenticated && role === "jobseeker" ? (
-                <Jobs key={location.pathname} />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
-          <Route
-            path="/jobs/:jobId/apply"
-            element={
-              isAuthenticated && role === "jobseeker" ? (
-                <ApplyJob key={location.pathname} />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
-          <Route
-            path="/jobseeker/profile"
-            element={
-              isAuthenticated && role === "jobseeker" ? (
-                <JobseekerProfile key={location.pathname} />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
+
           <Route
             path="/jobseeker/dashboard/*"
             element={
               isAuthenticated && role === "jobseeker" ? (
-                <JobseekerDashboard key={location.pathname} />
+                <JobseekerDashboard />
               ) : (
                 <Navigate to="/jobseeker/login" replace />
               )
             }
           />
 
-          {/* Employer routes */}
+          <Route
+            path="/jobseeker/dashboard/notifications"
+            element={
+              isAuthenticated && role === "jobseeker" ? (
+                <JobseekerNotifications />
+              ) : (
+                <Navigate to="/jobseeker/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/jobseeker/dashboard/interviews"
+            element={
+              isAuthenticated && role === "jobseeker" ? (
+                <JobseekerInterviews />
+              ) : (
+                <Navigate to="/jobseeker/login" replace />
+              )
+            }
+          />
+
+          {/* ================= EMPLOYER ================= */}
+
           <Route
             path="/employer/login"
             element={
               !isAuthenticated ? (
-                <EmployerLogin key={location.pathname} />
+                <EmployerLogin />
               ) : (
                 <Navigate to="/employer/dashboard" replace />
               )
             }
           />
+
           <Route
             path="/employer/register"
             element={
               !isAuthenticated ? (
-                <EmployerRegister key={location.pathname} />
+                <EmployerRegister />
               ) : (
                 <Navigate to="/employer/dashboard" replace />
               )
             }
           />
-          <Route
-            path="/employer/profile"
-            element={
-              isAuthenticated && role === "employer" ? (
-                <EmployerProfile key={location.pathname} />
-              ) : (
-                <Navigate to="/employer/login" replace />
-              )
-            }
-          />
-          <Route
-            path="/jobs/create"
-            element={
-              isAuthenticated && role === "employer" ? (
-                <PostJob key={location.pathname} />
-              ) : (
-                <Navigate to="/employer/login" replace />
-              )
-            }
-          />
-          <Route
-            path="/employer/dashboard/applications"
-            element={
-              isAuthenticated && role === "employer" ? (
-                <EmployerApplications key={location.pathname} />
-              ) : (
-                <Navigate to="/employer/login" replace />
-              )
-            }
-          />
+
           <Route
             path="/employer/dashboard/*"
             element={
               isAuthenticated && role === "employer" ? (
-                <EmployerDashboard key={location.pathname} />
+                <EmployerDashboard />
               ) : (
                 <Navigate to="/employer/login" replace />
               )
             }
           />
 
-          {/* Admin routes */}
+          {/* ================= ADMIN ================= */}
+
           <Route
             path="/admin/login"
             element={
               !isAuthenticated ? (
-                <AdminLogin key={location.pathname} />
+                <AdminLogin />
               ) : (
                 <Navigate to="/admin/dashboard" replace />
               )
             }
           />
+
           <Route
             path="/admin/register"
             element={
               !isAuthenticated ? (
-                <AdminRegister key={location.pathname} />
+                <AdminRegister />
               ) : (
                 <Navigate to="/admin/dashboard" replace />
               )
             }
           />
-          <Route
-            path="/admin/profile"
-            element={
-              isAuthenticated && role === "admin" ? (
-                <AdminProfile key={location.pathname} />
-              ) : (
-                <Navigate to="/admin/login" replace />
-              )
-            }
-          />
+
           <Route
             path="/admin/dashboard/*"
             element={
               isAuthenticated && role === "admin" ? (
-                <AdminDashboard key={location.pathname} />
+                <AdminDashboard />
               ) : (
                 <Navigate to="/admin/login" replace />
               )
             }
           />
 
-          {/* Shared Chat route */}
+          {/* ================= SHARED ================= */}
+
           <Route
             path="/chat"
             element={
               isAuthenticated ? (
-                <ChatPage key={location.pathname} />
+                <ChatPage />
               ) : (
                 <Navigate to="/jobseeker/login" replace />
               )
             }
           />
 
-          {/* Catch-all */}
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

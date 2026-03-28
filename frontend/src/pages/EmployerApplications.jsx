@@ -8,7 +8,7 @@ import {
 } from "../api/applications";
 import StatusBadge from "../components/applications/StatusBadge";
 
-const EmployerApplications = ({ setSelectedChatUser }) => {
+const EmployerApplications = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -17,7 +17,7 @@ const EmployerApplications = ({ setSelectedChatUser }) => {
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
 
-  // --- Fetch applications for the logged-in employer ---
+  // ✅ Fetch Employer Applications
   const fetchApps = async () => {
     if (!user?.employerId) {
       setError("Employer ID not found. Are you logged in as an employer?");
@@ -28,21 +28,24 @@ const EmployerApplications = ({ setSelectedChatUser }) => {
     try {
       setLoading(true);
       const data = await getEmployerApplications(user.employerId);
-      setApps(data.applications || []);
-      setCount(data.count || 0);
+      // ✅ backend returns an array directly
+      setApps(data || []);
+      setCount((data || []).length);
     } catch (err) {
       console.error("Error fetching employer applications", err);
-      setError("Failed to load applications. Please try again later.");
+      setError("Failed to load applications.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchApps();
+    if (user?.employerId) {
+      fetchApps();
+    }
   }, [user?.employerId]);
 
-  // --- Handle application status updates ---
+  // ✅ Update Status
   const handleReview = async (appId, newStatus) => {
     try {
       await updateApplicationStatus(appId, newStatus);
@@ -53,13 +56,22 @@ const EmployerApplications = ({ setSelectedChatUser }) => {
       );
     } catch (err) {
       console.error("Error updating status", err);
-      alert("Failed to update status. Try again.");
+      alert("Failed to update status.");
     }
+  };
+
+  // ✅ Navigate to Chat (Direct Conversation)
+  const handleMessage = (app) => {
+    if (!app?.userId?._id) return;
+    navigate(`/employer/chat/${app.userId._id}`, {
+      state: { receiverName: app.userId.name },
+    });
   };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-bold mb-4">Applications for My Jobs</h1>
+
       {count > 0 && (
         <p className="text-slate-600 mb-6">{count} applications found</p>
       )}
@@ -83,27 +95,35 @@ const EmployerApplications = ({ setSelectedChatUser }) => {
             <tbody>
               {apps.map((app) => (
                 <tr key={app._id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4">{app.jobId?.title}</td>
+                  <td className="px-6 py-4">{app.jobId?.title || "Unknown Job"}</td>
+
                   <td className="px-6 py-4">
-                    {app.userId?.name}
+                    {app.userId?.name || "Unknown"}
                     <br />
                     <span className="text-sm text-slate-500">
-                      {app.userId?.email}
+                      {app.userId?.email || "No email"}
                     </span>
                   </td>
+
                   <td className="px-6 py-4">
-                    <a
-                      href={app.resume}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                    >
-                      <FileText size={14} /> View <ExternalLink size={14} />
-                    </a>
+                    {app.resume ? (
+                      <a
+                        href={app.resume}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                      >
+                        <FileText size={14} /> View <ExternalLink size={14} />
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">No resume</span>
+                    )}
                   </td>
+
                   <td className="px-6 py-4">
                     <StatusBadge status={app.status} />
                   </td>
+
                   <td className="px-6 py-4 flex gap-2 flex-wrap">
                     <button
                       onClick={() => handleReview(app._id, "shortlisted")}
@@ -111,12 +131,14 @@ const EmployerApplications = ({ setSelectedChatUser }) => {
                     >
                       Shortlist
                     </button>
+
                     <button
                       onClick={() => handleReview(app._id, "rejected")}
                       className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
                     >
                       Reject
                     </button>
+
                     <button
                       onClick={() => handleReview(app._id, "interview")}
                       className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -124,17 +146,8 @@ const EmployerApplications = ({ setSelectedChatUser }) => {
                       Mark Interview
                     </button>
 
-                    {/* --- Updated: Message button navigates to chat --- */}
                     <button
-                      onClick={() => {
-                        if (setSelectedChatUser) {
-                          setSelectedChatUser({
-                            id: app.userId._id,
-                            name: app.userId.name,
-                          });
-                        }
-                        navigate("/employer/chat"); // ✅ go to chat route
-                      }}
+                      onClick={() => handleMessage(app)}
                       className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1"
                     >
                       <MessageSquare size={14} /> Message

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from "react";
 import { getJobs, updateJob, deleteJob } from "../services/api";
 import { AuthContext } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Jobs() {
   const { user, role } = useContext(AuthContext);
@@ -9,6 +9,7 @@ export default function Jobs() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -32,12 +33,22 @@ export default function Jobs() {
       }
     };
 
-    if (role === "jobseeker" || role === "employer") {
-      fetchJobs();
+    // ✅ Only fetch when on applications or jobs routes
+    if (
+      location.pathname.includes("/applications") ||
+      location.pathname.includes("/jobs") ||
+      location.pathname.includes("/my-jobs")
+    ) {
+      if (role === "jobseeker" || role === "employer") {
+        fetchJobs();
+      } else {
+        setLoading(false);
+      }
     } else {
+      // Skip fetching when not on jobs/applications page
       setLoading(false);
     }
-  }, [role, user]);
+  }, [role, user, location.pathname]);
 
   const handleDelete = async (jobId) => {
     try {
@@ -115,7 +126,7 @@ export default function Jobs() {
                 {/* Jobseeker actions */}
                 {role === "jobseeker" && (
                   <button
-                    onClick={() => navigate(`/jobs/${jobId}/apply`)} // ✅ navigate to ApplyJob form
+                    onClick={() => navigate(`/jobs/${jobId}/apply`)}
                     className="mt-4 px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
                   >
                     Apply

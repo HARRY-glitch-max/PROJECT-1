@@ -9,27 +9,28 @@ import connectDB from "./config/db.js";
 import mongoose from "mongoose";
 import http from "http";
 import { Server } from "socket.io";
+
+// --- 1. IMPORT MODELS ---
+import "./models/Jobseeker.js"; 
+import "./models/Employer.js";
+import "./models/Job.js";
+import "./models/Interview.js";
 import Chat from "./models/Chat.js"; 
-import Jobseeker from "./models/Jobseeker.js"; // ✅ import Jobseekeer model
 
 // --- Load environment variables ---
 dotenv.config();
 
-// --- Resolve __dirname in ES modules ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// --- Security middleware ---
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
-// --- Logging middleware ---
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// --- CORS CONFIGURATION ---
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -48,11 +49,8 @@ app.use(
   })
 );
 
-// --- Body parsers ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// --- Static uploads ---
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // --- ROUTES ---
@@ -76,22 +74,18 @@ app.use("/api/interviews", interviewRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/test", testRoutes);
 
-// --- Health-check route ---
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "API is alive" });
 });
 
-// --- Default route ---
 app.get("/", (req, res) => {
   res.send("Job Connect API is running...");
 });
 
-// --- Error middleware ---
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 app.use(notFound);
 app.use(errorHandler);
 
-// --- START SERVER ---
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -100,7 +94,7 @@ const startServer = async () => {
 
     const server = http.createServer(app);
 
-    // ✅ Attach Socket.IO
+    // --- SOCKET.IO INITIALIZATION ---
     const io = new Server(server, {
       cors: {
         origin: allowedOrigins,
@@ -112,37 +106,54 @@ const startServer = async () => {
     io.on("connection", (socket) => {
       console.log("🔌 User connected:", socket.id);
 
-      // Join personal room
+      // Join a private room based on User ID (works for both Jobseeker & Employer)
       socket.on("join", (userId) => {
         socket.join(userId);
-        console.log(`User ${userId} joined their room`);
+        console.log(`User ${userId} joined their private room`);
       });
 
-      // Handle sending messages
+      // Handle Real-time Messages
       socket.on("send_message", async (msg) => {
         try {
-          // Fetch sender/receiver details
-          const sender = await Jobseekeer.findById(msg.senderId).select("name avatar");
-          const receiver = await Jobseekeer.findById(msg.receiverId).select("name avatar");
+          const { senderId, receiverId, message, senderType } = msg;
+
+          // Dynamically select models to support cross-role communication
+          const JobSeeker = mongoose.model("JobSeeker");
+          const Employer = mongoose.model("Employer");
+
+          const SenderModel = senderType === "JobSeeker" ? JobSeeker : Employer;
+          const ReceiverModel = senderType === "JobSeeker" ? Employer : JobSeeker;
+
+          const [sender, receiver] = await Promise.all([
+            SenderModel.findById(senderId).select("name companyName avatar"),
+            ReceiverModel.findById(receiverId).select("name companyName avatar")
+          ]);
 
           const chat = new Chat({
-            senderId: msg.senderId,
-            senderName: sender?.name || "Unknown",
+            senderId,
+            senderName: sender?.name || sender?.companyName || "Unknown",
             senderAvatar: sender?.avatar || null,
-            receiverId: msg.receiverId,
-            receiverName: receiver?.name || "Unknown",
+            receiverId,
+            receiverName: receiver?.name || receiver?.companyName || "Unknown",
             receiverAvatar: receiver?.avatar || null,
-            message: msg.message,
+            message,
           });
 
           const savedMsg = await chat.save();
 
-          // Emit enriched message to both sender and receiver
-          io.to(msg.receiverId).emit("receive_message", savedMsg);
-          io.to(msg.senderId).emit("receive_message", savedMsg);
+          // Emit the message to both participants' private rooms
+          io.to(receiverId).emit("receive_message", savedMsg);
+          io.to(senderId).emit("receive_message", savedMsg);
+
         } catch (err) {
-          console.error("Error saving message:", err);
+          console.error("Socket Messaging Error:", err);
+          socket.emit("error", { message: "Could not send message" });
         }
+      });
+
+      // Typing indicators for better UX
+      socket.on("typing", ({ receiverId, isTyping }) => {
+        socket.to(receiverId).emit("display_typing", { isTyping });
       });
 
       socket.on("disconnect", () => {
@@ -152,37 +163,17 @@ const startServer = async () => {
 
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
-      console.log(`📡 Access via http://127.0.0.1:${PORT}`);
     });
 
-    // Graceful shutdown
     const shutdown = async () => {
-      console.log("\nShutting down server...");
-      try {
-        await new Promise((resolve, reject) => {
-          server.close((err) => {
-            if (err) return reject(err);
-            console.log("HTTP server closed.");
-            resolve();
-          });
-        });
-        await mongoose.connection.close();
-        console.log("MongoDB connection closed.");
-        process.exit(0);
-      } catch (err) {
-        console.error("Error during shutdown:", err);
-        process.exit(1);
-      }
+      console.log("\nShutting down...");
+      server.close();
+      await mongoose.connection.close();
+      process.exit(0);
     };
 
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
-    process.on("uncaughtException", (err) => {
-      console.error("Uncaught Exception:", err.stack || err);
-    });
-    process.on("unhandledRejection", (err) => {
-      console.error("Unhandled Rejection:", err.stack || err);
-    });
   } catch (err) {
     console.error("Startup error:", err.stack || err);
     process.exit(1);

@@ -15,7 +15,7 @@ const employerSchema = new mongoose.Schema({
   admin: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" }
 });
 
-// ✅ Hash password before saving (Option 1: async/await, no next)
+// ✅ Hash password before saving
 employerSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
   const salt = await bcrypt.genSalt(10);
@@ -27,6 +27,8 @@ employerSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-const Employer = mongoose.model("Employer", employerSchema);
+// ✅ Prevent OverwriteModelError
+const Employer =
+  mongoose.models.Employer || mongoose.model("Employer", employerSchema);
 
 export default Employer;

@@ -6,24 +6,29 @@ import {
   getEmployerById,
   updateEmployer,
   deleteEmployer,
-} from "../controllers/employerController.js"; // 👈 only employer-specific functions
-import { shortlistCandidate } from "../controllers/applicationController.js"; // 👈 import from the right place
+  getEmployerJobs,        // ✅ new
+  getEmployerInterviews,  // ✅ new
+} from "../controllers/employerController.js";
+import { shortlistCandidate } from "../controllers/applicationController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// 1. PUBLIC AUTH ROUTES (Specific)
+// 1. PUBLIC AUTH ROUTES
 router.post("/register", createEmployer);
 router.post("/login", loginEmployer);
 
-// 2. SPECIFIC EMPLOYER ACTIONS (Specific)
-// This is safe because "/applications" is a hard string, not a dynamic ID
+// 2. EMPLOYER-SPECIFIC ACTIONS
 router.put("/applications/:id/shortlist", protect, shortlistCandidate);
 
-// 3. GENERAL COLLECTION ROUTES
+// 3. EMPLOYER JOBS & INTERVIEWS
+router.get("/jobs", protect, getEmployerJobs);
+router.get("/interviews", protect, getEmployerInterviews);
+
+// 4. GENERAL COLLECTION ROUTES
 router.get("/", protect, getEmployers);
 
-// 4. DYNAMIC ID ROUTES (Generic - Always at the bottom)
+// 5. DYNAMIC ID ROUTES (always last)
 router.get("/:id", protect, getEmployerById);
 router.put("/:id", protect, updateEmployer);
 router.delete("/:id", protect, deleteEmployer);

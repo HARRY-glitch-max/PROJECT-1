@@ -9,18 +9,18 @@ const applicationSchema = new mongoose.Schema(
       required: true,
     },
 
-    // ✅ Applicant reference (Jobseeker)
+    // ✅ Applicant reference (Standardized to JobSeeker)
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Jobseeker", // updated from "User"
+      ref: "JobSeeker", // 👈 FIXED: Changed from "Jobseeker" to "JobSeeker"
       required: true,
     },
 
-    // ✅ Employer reference (optional, auto-injected from Job in controller)
+    // ✅ Employer reference
     employerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employer",
-      required: false, // ✅ changed
+      required: false,
     },
 
     // ✅ Resume file path or URL
@@ -50,9 +50,10 @@ const applicationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Optional: index for faster queries by employer/jobseeker
+// Index for faster queries
 applicationSchema.index({ jobId: 1, userId: 1, employerId: 1 });
 
-const Application = mongoose.model("Application", applicationSchema);
+// Check if model exists to prevent OverwriteModelError in development
+const Application = mongoose.models.Application || mongoose.model("Application", applicationSchema);
 
 export default Application;
