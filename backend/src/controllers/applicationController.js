@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import Application from "../models/Application.js";
 import Notification from "../models/Notification.js";
 import Job from "../models/Job.js";
-import JobSeeker from "../models/Jobseeker.js"; 
 import { notifyJobseeker } from "../utils/notifyJobseeker.js";
 import { v2 as cloudinary } from "cloudinary";
 
@@ -12,8 +11,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// --- 🛡️ NEW: Check if user has applied to a specific job ---
-// Used by JobCard to toggle between "Apply" and "Chat"
+// --- 🛡️ Check if user has applied to a specific job ---
 export const checkApplicationStatus = async (req, res) => {
   try {
     const { userId, jobId } = req.params;
@@ -22,11 +20,7 @@ export const checkApplicationStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid IDs provided" });
     }
 
-    const application = await Application.findOne({ 
-      userId: userId, // Match the schema field name (userId vs jobseekerId)
-      jobId: jobId 
-    }).select("_id");
-
+    const application = await Application.findOne({ userId, jobId }).select("_id");
     res.status(200).json({ applied: !!application });
   } catch (error) {
     console.error("Error in checkApplicationStatus:", error);
@@ -39,7 +33,6 @@ export const createApplication = async (req, res) => {
   try {
     const { jobId, userId } = req.body;
 
-    // Prevent double applications
     const existingApp = await Application.findOne({ jobId, userId });
     if (existingApp) {
       return res.status(400).json({ message: "You have already applied for this position." });
@@ -70,7 +63,7 @@ export const createApplication = async (req, res) => {
     await newApp.save();
 
     const application = await Application.findById(newApp._id)
-      .populate("userId", "name email avatar") 
+      .populate("userId", "name email avatar")
       .populate("jobId", "title");
 
     if (application.userId?.email) {
@@ -78,18 +71,17 @@ export const createApplication = async (req, res) => {
         email: application.userId.email,
         name: application.userId.name,
         subject: "Application Successfully Received",
-        message: `Thank you for applying for the "${job.title}" position. Your resume has been uploaded successfully.`,
+        message: `Thank you for applying for the "${job.title}" position.`,
       });
     }
 
     res.status(201).json({ message: "Application submitted successfully!", application });
   } catch (error) {
-    console.error("Error in createApplication:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// --- 2. Update application status ---
+// --- 2. Update application status (General) ---
 export const updateApplicationStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -97,7 +89,7 @@ export const updateApplicationStatus = async (req, res) => {
 
     const application = await Application.findByIdAndUpdate(id, { status }, { new: true })
       .populate("userId", "name email avatar")
-      .populate("jobId", "title employerId");
+      .populate("jobId", "title");
 
     if (!application) return res.status(404).json({ message: "Application not found" });
 
@@ -107,25 +99,17 @@ export const updateApplicationStatus = async (req, res) => {
       content: `Update: Your application status for "${application.jobId.title}" is now ${status}.`,
     });
 
-    if (application.userId?.email) {
-      await notifyJobseeker({
-        email: application.userId.email,
-        name: application.userId.name,
-        subject: `Application Update: ${status}`,
-        message: `The employer has updated your application status for "${application.jobId.title}" to: ${status}.`,
-      });
-    }
-
-    res.json({ message: "Application status updated successfully", application });
+    res.json({ message: "Status updated", application });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// --- 3. Shortlist candidate ---
+// --- 3. Shortlist candidate (Specific for Employer Routes) ---
 export const shortlistCandidate = async (req, res) => {
   try {
-    const application = await Application.findById(req.params.id)
+    const { id } = req.params;
+    const application = await Application.findById(id)
       .populate("userId", "name email avatar")
       .populate("jobId", "title");
 
@@ -141,73 +125,21 @@ export const shortlistCandidate = async (req, res) => {
       content: `Congratulations! You've been shortlisted for "${application.jobId.title}".`,
     });
 
-    if (application.userId?.email) {
-      await notifyJobseeker({
-        email: application.userId.email,
-        name: application.userId.name,
-        subject: "Good News: You've been Shortlisted!",
-        message: `Excellent news, ${application.userId.name}! You have been shortlisted for the "${application.jobId.title}" role.`,
-      });
-    }
-
     res.json({ message: "Candidate shortlisted", application });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// --- 4. Delete application ---
-export const deleteApplication = async (req, res) => {
-  try {
-    const application = await Application.findByIdAndDelete(req.params.id);
-    if (!application) return res.status(404).json({ message: "Application not found" });
-    res.json({ message: "Application deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// --- 5. Get all applications ---
-export const getApplications = async (req, res) => {
-  try {
-    const applications = await Application.find()
-      .populate({
-        path: "jobId",
-        select: "title employerId",
-        populate: { path: "employerId", select: "companyName contactEmail" },
-      })
-      .populate("userId", "name email avatar");
-    res.json(applications);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// --- 6. Get applications by employer ---
-export const getApplicationsByEmployer = async (req, res) => {
-  try {
-    const { employerId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(employerId)) {
-      return res.status(400).json({ message: "Invalid employer ID" });
-    }
-
-    const applications = await Application.find({ employerId })
-      .populate("userId", "name email avatar")
-      .populate("jobId", "title location type");
-
-    res.status(200).json(applications); 
-  } catch (error) {
-    console.error("Error fetching applications by employer:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// --- 7. Standard helper getters ---
+// --- 4. Get application by ID (Fixes the current crash) ---
 export const getApplicationById = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id)
       .populate("userId", "name email avatar")
-      .populate("jobId", "title");
+      .populate({
+        path: "jobId",
+        populate: { path: "employerId", select: "companyName avatar" }
+      });
     if (!application) return res.status(404).json({ message: "Application not found" });
     res.json(application);
   } catch (error) {
@@ -215,6 +147,41 @@ export const getApplicationById = async (req, res) => {
   }
 };
 
+// --- 5. Get applications by User (Jobseeker Dashboard) ---
+export const getApplicationsByUser = async (req, res) => {
+  try {
+    const applications = await Application.find({ userId: req.params.userId })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "jobId",
+        select: "title employerId",
+        populate: { 
+          path: "employerId", 
+          select: "companyName avatar _id" 
+        }
+      });
+    res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// --- 6. Get applications by Employer (Employer Dashboard) ---
+export const getApplicationsByEmployer = async (req, res) => {
+  try {
+    const { employerId } = req.params;
+    const applications = await Application.find({ employerId })
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email avatar")
+      .populate("jobId", "title location type");
+
+    res.status(200).json(applications);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// --- 7. Get applications by Job ID ---
 export const getApplicationsByJob = async (req, res) => {
   try {
     const applications = await Application.find({ jobId: req.params.jobId })
@@ -225,11 +192,24 @@ export const getApplicationsByJob = async (req, res) => {
   }
 };
 
-export const getApplicationsByUser = async (req, res) => {
+// --- 8. Get ALL applications (Global Admin/Stats) ---
+export const getApplications = async (req, res) => {
   try {
-    const applications = await Application.find({ userId: req.params.userId })
-      .populate("jobId", "title company location");
+    const applications = await Application.find()
+      .populate("userId", "name email")
+      .populate("jobId", "title");
     res.json(applications);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// --- 9. Delete Application ---
+export const deleteApplication = async (req, res) => {
+  try {
+    const application = await Application.findByIdAndDelete(req.params.id);
+    if (!application) return res.status(404).json({ message: "Application not found" });
+    res.json({ message: "Application deleted" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

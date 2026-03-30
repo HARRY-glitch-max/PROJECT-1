@@ -4,66 +4,77 @@ import Employer from "../models/Employer.js";
 import Application from "../models/Application.js";
 import mongoose from "mongoose";
 
-// --- Helper: Verify Application exists between two parties ---
+/**
+ * 🛡️ Security Helper
+ * Verifies that a Jobseeker and Employer have a formal connection 
+ * via an application before allowing communication.
+ */
 const checkApplicationExists = async (id1, id2) => {
   return await Application.findOne({
     $or: [
-      { jobseekerId: id1, employerId: id2 },
-      { jobseekerId: id2, employerId: id1 }
+      { userId: id1, employerId: id2 },
+      { userId: id2, employerId: id1 }
     ]
-  });
+  }).lean();
 };
 
-// --- 1. Send a new message (with Permission Guard) ---
+// --- 1. Send a New Message ---
 export const sendMessage = async (req, res) => {
   try {
     const { senderId, receiverId, message, senderType } = req.body;
 
-    // 🛑 1. Permission Check: Verify an application exists
+    if (!message || message.trim() === "") {
+      return res.status(400).json({ message: "Message content cannot be empty." });
+    }
+
+    // Authorization: Only allow messaging if an application exists
     const hasConnection = await checkApplicationExists(senderId, receiverId);
     if (!hasConnection) {
       return res.status(403).json({ 
-        message: "Access Denied: You can only message after an application is submitted." 
+        message: "Access Denied: You can only message after an application has been submitted." 
       });
     }
 
-    // 2. Fetch sender and receiver details dynamically
-    const SenderModel = senderType === "JobSeeker" ? JobSeeker : Employer;
-    const ReceiverModel = senderType === "JobSeeker" ? Employer : JobSeeker;
+    // Dynamically determine models based on sender role
+    const IsJobSeeker = senderType === "JobSeeker";
+    const SenderModel = IsJobSeeker ? JobSeeker : Employer;
+    const ReceiverModel = IsJobSeeker ? Employer : JobSeeker;
 
     const [sender, receiver] = await Promise.all([
-      SenderModel.findById(senderId).select("name companyName avatar"),
-      ReceiverModel.findById(receiverId).select("name companyName avatar")
+      SenderModel.findById(senderId).select("name companyName avatar").lean(),
+      ReceiverModel.findById(receiverId).select("name companyName avatar").lean()
     ]);
 
-    const chat = new Chat({
+    if (!sender || !receiver) {
+      return res.status(404).json({ message: "Sender or Receiver profile not found." });
+    }
+
+    const newChat = new Chat({
       senderId,
-      senderName: sender?.name || sender?.companyName || "Unknown",
-      senderAvatar: sender?.avatar || null,
+      senderName: sender.companyName || sender.name || "Unknown User",
+      senderAvatar: sender.avatar || null,
       receiverId,
-      receiverName: receiver?.name || receiver?.companyName || "Unknown",
-      receiverAvatar: receiver?.avatar || null,
-      message,
+      receiverName: receiver.companyName || receiver.name || "Unknown User",
+      receiverAvatar: receiver.avatar || null,
+      message: message.trim(),
     });
 
-    const savedChat = await chat.save();
-
+    const savedChat = await newChat.save();
     res.status(201).json(savedChat);
   } catch (error) {
-    console.error("Error in sendMessage:", error);
-    res.status(500).json({ message: error.message });
+    console.error("Send Message Error:", error);
+    res.status(500).json({ message: "Server error while sending message." });
   }
 };
 
-// --- 2. Get chat history (with Permission Guard) ---
+// --- 2. Get Chat History (One-on-One) ---
 export const getChatHistory = async (req, res) => {
   try {
     const { senderId, receiverId } = req.params;
 
-    // 🛑 Permission Check
     const hasConnection = await checkApplicationExists(senderId, receiverId);
     if (!hasConnection) {
-      return res.status(403).json({ message: "No active application found between these users." });
+      return res.status(403).json({ message: "Authorization failed: No active application found." });
     }
 
     const chats = await Chat.find({
@@ -72,41 +83,72 @@ export const getChatHistory = async (req, res) => {
         { senderId: receiverId, receiverId: senderId },
       ],
     })
-      .sort({ createdAt: 1 }) // Use createdAt if using timestamps: true
-      .lean();
+    .sort({ createdAt: 1 })
+    .lean();
 
-    res.json(chats);
+    res.status(200).json(chats);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Error retrieving chat history." });
   }
 };
 
-// --- 3. Get Inbox (Recent Chats only for applied jobs) ---
+// --- 3. Get Inbox (Sidebar Conversation List) ---
 export const getUserChats = async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid User ID format." });
+    }
 
-    // 1. Find all employers/seekers connected via applications
-    const apps = await Application.find({
-      $or: [{ jobseekerId: userId }, { employerId: userId }]
-    }).select("jobseekerId employerId");
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    const connectedIds = apps.map(a => 
-      a.jobseekerId.toString() === userId ? a.employerId : a.jobseekerId
-    );
+    const inbox = await Chat.aggregate([
+      {
+        $match: {
+          $or: [{ senderId: userObjectId }, { receiverId: userObjectId }]
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $gt: ["$senderId", "$receiverId"] },
+              { s: "$senderId", r: "$receiverId" },
+              { s: "$receiverId", r: "$senderId" }
+            ]
+          },
+          lastMessage: { $first: "$message" },
+          createdAt: { $first: "$createdAt" },
+          contactId: {
+            $first: { $cond: [{ $eq: ["$senderId", userObjectId] }, "$receiverId", "$senderId"] }
+          },
+          contactName: {
+            $first: { $cond: [{ $eq: ["$senderId", userObjectId] }, "$receiverName", "$senderName"] }
+          },
+          contactAvatar: {
+            $first: { $cond: [{ $eq: ["$senderId", userObjectId] }, "$receiverAvatar", "$senderAvatar"] }
+          }
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
 
-    // 2. Get latest messages only with those connected IDs
-    const chats = await Chat.find({
-      $or: [
-        { senderId: userId, receiverId: { $in: connectedIds } },
-        { receiverId: userId, senderId: { $in: connectedIds } },
-      ],
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    const formattedInbox = inbox.map(item => ({
+      _id: item.contactId,
+      lastMessage: item.lastMessage,
+      lastMessageAt: item.createdAt,
+      otherUser: {
+        _id: item.contactId,
+        name: item.contactName,
+        avatar: item.contactAvatar
+      }
+    }));
 
-    res.json(chats);
+    res.status(200).json(formattedInbox);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Inbox Aggregation Error:", error);
+    res.status(500).json({ message: "Error generating inbox." });
   }
 };

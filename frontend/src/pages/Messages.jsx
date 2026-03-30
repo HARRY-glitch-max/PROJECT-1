@@ -1,146 +1,243 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
-import { getUserChats, getChatHistory, sendMessage } from '../api/chat'; // ✅ include sendMessage
-import { Send, User } from 'lucide-react';
+import { getUserChats, getChatHistory, sendMessage } from '../api/chat';
+import { Send, MessageSquare } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const Messages = () => {
   const { user } = useAuth();
   const socket = useSocket();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
   const scrollRef = useRef();
 
-  // Load sidebar conversations (inbox style)
+  // Unified ID extraction - Essential for Employer/JobSeeker distinction
+  const currentUserId = user?.employerId || user?.userId || user?._id;
+
+  // ✅ 1. Auto-select first chat
+  useEffect(() => {
+    if (conversations.length > 0 && !activeChat) {
+      const first = conversations[0];
+      const rid = first.otherUser?._id || first._id;
+      setActiveChat({ ...first, _id: rid });
+    }
+  }, [conversations, activeChat]);
+
+  // ✅ 2. Load chats and handle deep-linking (target params)
   useEffect(() => {
     const loadChats = async () => {
-      const data = await getUserChats(user._id);
-      setConversations(data);
-    };
-    if (user?._id) loadChats();
-  }, [user?._id]);
+      try {
+        if (!currentUserId) return;
+        const data = await getUserChats(currentUserId);
+        setConversations(data);
 
-  // Load messages when a contact is clicked
+        const params = new URLSearchParams(location.search);
+        const targetId = params.get('target');
+        const targetName = params.get('name');
+
+        if (targetId) {
+          const existingChat = data.find(c => 
+            (c.otherUser?._id === targetId || c.senderId?._id === targetId || c.receiverId?._id === targetId || c._id === targetId)
+          );
+
+          if (existingChat) {
+            setActiveChat({ ...existingChat, _id: targetId });
+          } else if (targetName) {
+            setActiveChat({ _id: targetId, name: targetName, isNew: true });
+          }
+          navigate(location.pathname, { replace: true });
+        }
+      } catch (err) {
+        console.error("❌ Error loading chats", err);
+      }
+    };
+    loadChats();
+  }, [currentUserId, location.search, navigate]);
+
+  // ✅ 3. Load message history
   useEffect(() => {
-    if (activeChat) {
+    const recipientId = activeChat?.otherUser?._id || activeChat?._id;
+    if (recipientId && !activeChat.isNew) {
       const loadMessages = async () => {
-        const data = await getChatHistory(user._id, activeChat._id);
-        setMessages(data);
+        try {
+          const data = await getChatHistory(currentUserId, recipientId);
+          setMessages(data);
+        } catch (err) {
+          console.error("❌ Error fetching history", err);
+        }
       };
       loadMessages();
+    } else {
+      setMessages([]);
     }
-  }, [activeChat, user._id]);
+  }, [activeChat, currentUserId]);
 
-  // Listen for real-time messages via Socket
+  // ✅ 4. Socket real-time listener
   useEffect(() => {
-    if (socket) {
-      socket.on("receive_message", (message) => {
-        if (
-          message.senderId === activeChat?._id ||
-          message.receiverId === activeChat?._id
-        ) {
-          setMessages((prev) => [...prev, message]);
+    if (socket && activeChat) {
+      const recipientId = activeChat.otherUser?._id || activeChat._id;
+      const handleReceive = (message) => {
+        const isRelevant = message.senderId === recipientId || message.receiverId === recipientId;
+        if (isRelevant) {
+          setMessages(prev => [...prev, message]);
         }
-      });
+      };
+      socket.on("receive_message", handleReceive);
+      return () => socket.off("receive_message", handleReceive);
     }
-    return () => socket?.off("receive_message");
   }, [socket, activeChat]);
 
-  // Scroll to bottom on new message
+  // ✅ 5. Auto scroll to bottom
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ✅ Persist + emit new message
+  // ✅ 6. SEND MESSAGE LOGIC
   const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !activeChat) return;
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation(); // Stop event bubbling
+    }
+    
+    // THE ULTIMATE CONSOLE CHECK
+    console.log("🔥 CLICK REGISTERED AT:", new Date().toLocaleTimeString());
+
+    const recipientId = activeChat?.otherUser?._id || activeChat?._id;
+
+    if (sending || !newMessage.trim() || !recipientId || !currentUserId) {
+      console.warn("⚠️ Validation Failed:", { sending, recipientId, currentUserId });
+      return;
+    }
 
     const messageData = {
-      receiverId: activeChat._id,
-      senderId: user._id,
-      message: newMessage, // match backend schema
+      receiverId: recipientId,
+      senderId: currentUserId,
+      message: newMessage.trim(),
+      senderType: user?.employerId ? "Employer" : "JobSeeker"
     };
 
-    // Save to DB
-    const savedMsg = await sendMessage(messageData);
+    try {
+      setSending(true);
+      const savedMsg = await sendMessage(messageData);
+      
+      setMessages(prev => [...prev, savedMsg]);
+      setNewMessage('');
 
-    // Emit to socket for real-time delivery
-    socket.emit("send_message", savedMsg);
+      if (socket) {
+        socket.emit("send_message", savedMsg);
+      }
 
-    // Update local state immediately
-    setMessages((prev) => [...prev, savedMsg]);
-    setNewMessage('');
+      if (activeChat.isNew) {
+        const updatedChats = await getUserChats(currentUserId);
+        setConversations(updatedChats);
+        setActiveChat(prev => ({ ...prev, isNew: false }));
+      }
+    } catch (err) {
+      console.error("❌ API FAILURE:", err.response?.data || err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-white">
-      {/* Sidebar: Contact List */}
-      <div className="w-1/4 border-r overflow-y-auto bg-slate-50">
-        <div className="p-4 font-bold text-lg border-b bg-white">Messages</div>
-        {conversations.map((conv) => (
-          <div 
-            key={conv._id}
-            onClick={() => setActiveChat(conv)}
-            className={`p-4 flex items-center gap-3 cursor-pointer hover:bg-blue-50 border-b ${
-              activeChat?._id === conv._id ? 'bg-blue-50 border-r-4 border-r-blue-600' : ''
-            }`}
-          >
-            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
-              <User size={20}/>
-            </div>
-            <div className="flex-1 truncate">
-              <p className="font-semibold text-sm">{conv.name}</p>
-              <p className="text-xs text-slate-500 truncate">{conv.lastMessage}</p>
-            </div>
-          </div>
-        ))}
+    <div className="flex h-full w-full bg-white overflow-hidden relative">
+      {/* Sidebar */}
+      <div className="w-1/4 border-r overflow-y-auto bg-slate-50 flex flex-col shrink-0">
+        <div className="p-6 font-bold text-xl border-b bg-white sticky top-0 z-10">Inbox</div>
+        <div className="flex-1">
+          {conversations.map((conv) => {
+            const rid = conv.otherUser?._id || conv._id;
+            const isActive = activeChat?._id === rid;
+            return (
+              <div
+                key={conv._id}
+                onClick={() => setActiveChat({ ...conv, _id: rid })}
+                className={`p-4 flex items-center gap-3 cursor-pointer border-b transition-all ${
+                  isActive ? 'bg-blue-600 text-white' : 'hover:bg-blue-50 bg-white'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                  {(conv.otherUser?.name?.[0] || conv.name?.[0] || 'U').toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm truncate">{conv.otherUser?.name || conv.name || "User"}</p>
+                  <p className={`text-xs truncate ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>
+                    {conv.lastMessage || "No messages yet"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col bg-slate-50 relative min-w-0">
         {activeChat ? (
           <>
-            <div className="p-4 border-b font-bold flex items-center gap-3 shadow-sm">
-               <div className="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center text-xs">
-                 {activeChat.name[0]}
-               </div>
-               {activeChat.name}
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-              {messages.map((msg, index) => (
-                <div key={index} className={`flex ${msg.senderId === user._id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[70%] p-3 rounded-2xl text-sm ${
-                    msg.senderId === user._id
-                      ? 'bg-blue-600 text-white rounded-tr-none'
-                      : 'bg-white border rounded-tl-none text-slate-800'
-                  }`}>
-                    {msg.message || msg.text}
-                  </div>
-                </div>
-              ))}
-              <div ref={scrollRef} />
+            <div className="p-4 border-b font-bold bg-white shadow-sm z-20 flex items-center gap-2 shrink-0">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="truncate">{activeChat.otherUser?.name || activeChat.name}</span>
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2 bg-white">
-              <input 
-                type="text" 
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Write a message..."
-                className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <button type="submit" className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700">
-                <Send size={20} />
-              </button>
-            </form>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+              {messages.map((msg, index) => {
+                const isMe = msg.senderId === currentUserId;
+                return (
+                  <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`p-3 px-4 rounded-2xl text-sm shadow-sm max-w-[80%] break-words ${
+                      isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border text-slate-800 rounded-tl-none'
+                    }`}>
+                      {msg.message}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={scrollRef} className="h-2" />
+            </div>
+
+            {/* --- THE FIX: FORCED INTERACTION LAYER --- */}
+            <div className="p-4 bg-white border-t relative z-[100] isolate">
+              <form
+                onSubmit={handleSendMessage}
+                className="relative flex items-center max-w-4xl mx-auto"
+              >
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="w-full bg-slate-100 rounded-full px-6 py-4 outline-none focus:ring-2 focus:ring-blue-500 pr-16 text-slate-900 border-none shadow-inner"
+                />
+                <button
+                  type="submit"
+                  // Explicit onClick to bypass any form blocking
+                  onClick={(e) => {
+                    if (newMessage.trim()) handleSendMessage(e);
+                  }}
+                  disabled={sending || !newMessage.trim()}
+                  className="absolute right-2 bg-blue-600 text-white p-3 rounded-full disabled:opacity-30 hover:bg-blue-700 active:scale-90 transition-all z-[110] cursor-pointer shadow-md"
+                >
+                  <Send size={20} className="pointer-events-none" />
+                </button>
+              </form>
+            </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
-            Select a conversation to start chatting
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 text-center">
+            <div className="bg-white p-6 rounded-full shadow-sm mb-4">
+              <MessageSquare size={48} className="opacity-10" />
+            </div>
+            <h3 className="font-bold text-slate-600">No Chat Selected</h3>
+            <p className="text-sm max-w-xs mt-2">Choose a conversation from the sidebar to start messaging candidates.</p>
           </div>
         )}
       </div>

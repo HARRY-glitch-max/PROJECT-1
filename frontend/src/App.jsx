@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -12,35 +12,37 @@ import Navbar from "./components/layout/Navbar";
 
 import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
+import ApplyJob from "./pages/ApplyJob"; 
 
 // Shared
 import ChatPage from "./pages/ChatPage";
 
 // Jobseeker
 import JobseekerLogin from "./pages/JobseekerLogin";
-import JobseekerRegister from "./pages/JobseekerRegister";
 import JobseekerDashboard from "./pages/JobseekerDashboard";
-import JobseekerNotifications from "./pages/JobseekerNotifications";
-import JobseekerInterviews from "./pages/JobseekerInterviews";
 
 // Employer
 import EmployerLogin from "./pages/EmployerLogin";
-import EmployerRegister from "./pages/EmployerRegister";
 import EmployerDashboard from "./pages/EmployerDashboard";
 
 // Admin
 import AdminLogin from "./pages/AdminLogin";
-import AdminRegister from "./pages/AdminRegister";
 import AdminDashboard from "./pages/AdminDashboard";
 
 const AppContent = () => {
   const { loading, user, role } = useContext(AuthContext);
   const location = useLocation();
 
+  useEffect(() => {
+    console.log("📍 Navigation Change:", location.pathname);
+  }, [location]);
+
+  // Updated logic to ensure Navbar hides correctly on the Apply screen
   const hideNavbar =
     location.pathname.startsWith("/employer/dashboard") ||
     location.pathname.startsWith("/admin/dashboard") ||
-    location.pathname.startsWith("/jobseeker/dashboard");
+    location.pathname.startsWith("/jobseeker/dashboard") ||
+    location.pathname.startsWith("/apply");
 
   if (loading) {
     return (
@@ -58,156 +60,60 @@ const AppContent = () => {
 
       <main>
         <Routes>
+          {/* 1. PUBLIC ROUTES */}
           <Route path="/" element={<Home />} />
+          <Route path="/jobs" element={<Jobs />} />
 
-          {/* ================= JOBSEEKER ================= */}
+          {/* 2. APPLICATION ROUTE (Placed high for priority) */}
+          <Route 
+            path="/apply/:jobId" 
+            element={
+              isAuthenticated && role?.toLowerCase() === "jobseeker" 
+                ? <ApplyJob /> 
+                : <Navigate to="/jobseeker/login" replace />
+            } 
+          />
 
+          {/* 3. AUTH ROUTES */}
           <Route
             path="/jobseeker/login"
-            element={
-              !isAuthenticated ? (
-                <JobseekerLogin />
-              ) : (
-                <Navigate to="/jobseeker/dashboard" replace />
-              )
-            }
+            element={!isAuthenticated ? <JobseekerLogin /> : <Navigate to="/jobseeker/dashboard" replace />}
           />
-
-          <Route
-            path="/jobseeker/register"
-            element={
-              !isAuthenticated ? (
-                <JobseekerRegister />
-              ) : (
-                <Navigate to="/jobseeker/dashboard" replace />
-              )
-            }
-          />
-
-          <Route
-            path="/jobseeker/dashboard/*"
-            element={
-              isAuthenticated && role === "jobseeker" ? (
-                <JobseekerDashboard />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
-
-          <Route
-            path="/jobseeker/dashboard/notifications"
-            element={
-              isAuthenticated && role === "jobseeker" ? (
-                <JobseekerNotifications />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
-
-          <Route
-            path="/jobseeker/dashboard/interviews"
-            element={
-              isAuthenticated && role === "jobseeker" ? (
-                <JobseekerInterviews />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
-
-          {/* ================= EMPLOYER ================= */}
-
           <Route
             path="/employer/login"
-            element={
-              !isAuthenticated ? (
-                <EmployerLogin />
-              ) : (
-                <Navigate to="/employer/dashboard" replace />
-              )
-            }
+            element={!isAuthenticated ? <EmployerLogin /> : <Navigate to="/employer/dashboard" replace />}
           />
-
-          <Route
-            path="/employer/register"
-            element={
-              !isAuthenticated ? (
-                <EmployerRegister />
-              ) : (
-                <Navigate to="/employer/dashboard" replace />
-              )
-            }
-          />
-
-          <Route
-            path="/employer/dashboard/*"
-            element={
-              isAuthenticated && role === "employer" ? (
-                <EmployerDashboard />
-              ) : (
-                <Navigate to="/employer/login" replace />
-              )
-            }
-          />
-
-          {/* ================= ADMIN ================= */}
-
           <Route
             path="/admin/login"
-            element={
-              !isAuthenticated ? (
-                <AdminLogin />
-              ) : (
-                <Navigate to="/admin/dashboard" replace />
-              )
-            }
+            element={!isAuthenticated ? <AdminLogin /> : <Navigate to="/admin/dashboard" replace />}
           />
 
+          {/* 4. PROTECTED DASHBOARDS */}
           <Route
-            path="/admin/register"
-            element={
-              !isAuthenticated ? (
-                <AdminRegister />
-              ) : (
-                <Navigate to="/admin/dashboard" replace />
-              )
-            }
+            path="/jobseeker/dashboard/*"
+            element={isAuthenticated && role?.toLowerCase() === "jobseeker" ? <JobseekerDashboard /> : <Navigate to="/jobseeker/login" replace />}
           />
-
+          <Route
+            path="/employer/dashboard/*"
+            element={isAuthenticated && role?.toLowerCase() === "employer" ? <EmployerDashboard /> : <Navigate to="/employer/login" replace />}
+          />
           <Route
             path="/admin/dashboard/*"
-            element={
-              isAuthenticated && role === "admin" ? (
-                <AdminDashboard />
-              ) : (
-                <Navigate to="/admin/login" replace />
-              )
-            }
+            element={isAuthenticated && role?.toLowerCase() === "admin" ? <AdminDashboard /> : <Navigate to="/admin/login" replace />}
           />
 
-          {/* ================= SHARED ================= */}
+          {/* 5. SHARED ROUTES */}
+          <Route path="/chat" element={isAuthenticated ? <ChatPage /> : <Navigate to="/" replace />} />
+          <Route path="/chat/:receiverId" element={isAuthenticated ? <ChatPage /> : <Navigate to="/" replace />} />
 
-          <Route
-            path="/chat"
-            element={
-              isAuthenticated ? (
-                <ChatPage />
-              ) : (
-                <Navigate to="/jobseeker/login" replace />
-              )
-            }
-          />
-
-          {/* Fallback */}
+          {/* 6. FALLBACK (Keep this last) */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
       {!hideNavbar && (
-        <footer className="py-10 text-center text-slate-500 dark:text-slate-600 text-sm border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          © 2026 JobConnect. All rights reserved.
+        <footer className="py-10 text-center text-slate-500 text-sm border-t border-slate-200 bg-white">
+          © 2026 HireFlow. All rights reserved.
         </footer>
       )}
     </div>
